@@ -98,7 +98,7 @@ Project Status
 
 This is a project built by the author for his own use. Contributions are welcomed.
 
-The public repository for the project is found at: TK
+The public repository for the project is found at: https://github.com/unprolix/bastard
 
 
 License
