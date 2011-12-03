@@ -1,7 +1,6 @@
 {
-	"private": true,
 	"name": "bastard",
-	"version": "0.5.0",
+	"version": "0.5.1",
 	"description": "A webserver for static files that does things right.",
 	"keywords": "webserver, fingerprint, static",
 	"homepage": "http://jeremy.org/bastard/",
