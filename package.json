@@ -1,0 +1,58 @@
+{
+	"private": true,
+	"name": "bastard",
+	"version": "0.5.0",
+	"description": "A webserver for static files that does things right.",
+	"keywords": "webserver, fingerprint, static",
+	"homepage": "http://jeremy.org/bastard/",
+
+	"bugs": {
+		"email" : "jeremy-bastard@jeremy.org"
+	},
+	
+	"author": {
+		"name": "Jeremy Bornstein",
+		"email": "jeremy@jeremy.org",
+		"url": "http://jeremy.org/"
+	},
+	
+	"files": ["bastard.js", "start.js", "README.md"],
+	"main": "bastard.js",
+	"bin": {
+		"bastard" : "./start.js"
+	},
+	
+	"NOT_REALLY_man" : [ "./man/bastard.1" ],
+	"repository": {
+		"type": "hg",
+	  	"url" : "ssh://hg.kuhu.org/bastard"
+	},
+	
+	"config": {
+		"port": 80,
+		"host": null,
+		"base": null,
+		"debug": false,
+		"directories": false,
+		"rawURLPrefix": "/raw/",
+		"fingerprintURLPrefix": "/f/",
+		"urlPrefix": "/",
+		"workingDir": "/tmp/bastard"
+	},
+	
+	"scripts": {"start": "node start.js"},
+
+	"dependencies": {
+		"uglify-js": ">=1.1.1",
+		"csso": ">=1.2.8",
+		"gzbz2": ">=0.1.4",
+		"mime": ">=1.2.4"
+	},
+	
+	"engines": {
+		"node": ">=0.4.12",
+		"npm": ">=1.0.106"
+	}
+
+
+}
