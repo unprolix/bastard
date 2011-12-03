@@ -23,8 +23,8 @@
 	
 	"NOT_REALLY_man" : [ "./man/bastard.1" ],
 	"repository": {
-		"type": "hg",
-	  	"url" : "ssh://hg.kuhu.org/bastard"
+		"type": "git",
+	  	"url" : "https://github.com/unprolix/bastard"
 	},
 	
 	"config": {
