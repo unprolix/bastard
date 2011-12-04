@@ -48,9 +48,9 @@ Running from your own code
 
         bastardObj.getFingerprint (filePath, basePath, callback);
 
-	* filePath: full path to the file
-	* basePath: path to the file within the base directory (may be the same as the URL path for the file)
-	* callback: if present, will be called with the first argument being any error (or null) and the second argument being the fingerprint
+	* `filePath`: full path to the file
+	* `basePath`: path to the file within the base directory (may be the same as the URL path for the file)
+	* `callback`: if present, will be called with the first argument being any error (or null) and the second argument being the fingerprint
 
    If callback is not present and the fingerprint is already known, it will be returned immediately as the result of the function call. If callback is not present and the fingerprint is not already known, the fingerprint will be internally calculated and null will be returned from the function call.
 
@@ -62,25 +62,28 @@ Running from your own code
 Configuration
 =============
 
-host	Hostname or IP address at which to listen. If empty, will bind to all available IP addresses. (Default: empty)
+The following configuration variables may be set with `npm config bastard:xxx yyy` where `xxx` is the name of the parameter and `yyy` is the desired value. More help on configuration variables may be obtained via `npm`.
 
-port	Port number at which to listen. (Default: 80)
 
-base    Directory where files to be served reside. (Default: empty)
+ `host`	Hostname or IP address at which to listen. If empty, will bind to all available IP addresses. (Default: empty)
 
-rawURLPrefix	The prefix for URLs from which raw files should be served. These will be just as they are on disk: not minified, not compressed. (Default: /raw/)
+`port`	Port number at which to listen. (Default: 80)
 
-fingerprintURLPrefix	The prefix for URLs from which fingerprinted files should be served. The fingerprint will appear in the URLs after this prefix followed by the relative pathname to the file in the base directory. (Default: /f/)
+`base`    Directory where files to be served reside. (Default: empty)
 
-urlPrefix	The prefix for URLs from which non-fingerprinted files should be served.
+`rawURLPrefix`	The prefix for URLs from which raw files should be served. These will be just as they are on disk: not minified, not compressed. (Default: /raw/)
 
-workingDir	The location for temporary files to be kept. This includes on-disk copies of minified and compressed files that originate in the base directory. (Default: /tmp/bastard.dat)
+`fingerprintURLPrefix`	The prefix for URLs from which fingerprinted files should be served. The fingerprint will appear in the URLs after this prefix followed by the relative pathname to the file in the base directory. (Default: /f/)
 
-preload	If true, a cache record will be created for each available file before the server begins. This will not load all data from disk, but will calculate all new fingerprints necessary.
+`urlPrefix`	The prefix for URLs from which non-fingerprinted files should be served.
 
-debug	If true, turns on some debugging functionality. (Default: false)
+`workingDir`	The location for temporary files to be kept. This includes on-disk copies of minified and compressed files that originate in the base directory. (Default: /tmp/bastard.dat)
 
-directories	If true, will generate directory listings. (Not yet implemented.) (Default: false)
+`preload`	If true, a cache record will be created for each available file before the server begins. This will not load all data from disk, but will calculate all new fingerprints necessary.
+
+`debug`	If true, turns on some debugging functionality. (Default: false)
+
+`directories`	If true, will generate directory listings. (Not yet implemented.) (Default: false)
 
 
 
@@ -106,7 +109,7 @@ Future features:
 
 * Ability to use an API, instead of the filesystem, as the source of files to be served. This would allow serving data from (e.g.) key/value stores.
 
-* Ability to use an API to upload files from base directory to a key/value store--including fingerprinted URLs. This would allow bastard to front for a CDN.
+* Ability to use an API to upload processed files from base directory to a key/value store--including fingerprinted URLs. This would allow bastard to front for a CDN.
 
 
 
