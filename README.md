@@ -76,6 +76,8 @@ urlPrefix	The prefix for URLs from which non-fingerprinted files should be serve
 
 workingDir	The location for temporary files to be kept. This includes on-disk copies of minified and compressed files that originate in the base directory. (Default: /tmp/bastard.dat)
 
+preload	If true, a cache record will be created for each available file before the server begins. This will not load all data from disk, but will calculate all new fingerprints necessary.
+
 debug	If true, turns on some debugging functionality. (Default: false)
 
 directories	If true, will generate directory listings. (Not yet implemented.) (Default: false)
