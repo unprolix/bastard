@@ -1,26 +1,36 @@
 'use strict';
 
-var childProcess = require ('child_process');
+var child_process = require ('child_process');
 var fs = require ('fs');
 var uglify = require ("uglify-js");
 var csso = require ("csso");
 var gzbz2 = require ("gzbz2");
 var mime = require ('mime');
-
+var html_minifier = require ('html-minifier')
 /*
 
-TODO:
-	commandline
-	npm packaging
-	renaming
-	use a mime type guesser to figure out mime types and whether or not a file is binary
 	
-LATER:
+TODO:
 	optionally upload fingerprinted files to S3
 	generate S3 URLs for files
 	allow preloading of all files into memory
 
 */
+
+function minifyHTML (data) {
+	return html_minifier.minify (data, {
+		removeComments: true,
+		removeCommentsFromCDATA: true,
+		removeCDATASectionsFromCDATA: true,
+		collapseWhitespace: true,
+		collapseBooleanAttributes: true,
+		removeAttributeQuotes: true,
+		removeRedundantAttributes: true,
+		removeEmptyAttributes: true,
+		removeOptionalTags: true,
+		removeEmptyElements: false		
+	});
+}
 
 // These are reusable
 var JSP = uglify.parser;
@@ -81,7 +91,7 @@ function Bastard (config) {
 	var preprocessors = {
 		'.js': minifyJavascript,
 		'.css': csso.justDoIt,
-		'.html': null
+		'.html': minifyHTML
 	};
 
 	var ONE_WEEK = 60 * 60 * 24 * 7;
@@ -335,7 +345,7 @@ function Bastard (config) {
 			cacheRecord.contentType = mimeType;
 		}
 
-		childProcess.execFile ('/usr/bin/env', ['openssl', 'dgst', '-sha256', filePath], function (err, stdout, stderr) {
+		child_process.execFile ('/usr/bin/env', ['openssl', 'dgst', '-sha256', filePath], function (err, stdout, stderr) {
 			if (err) {
 				console.error ("Error from fingerprinting: " + JSON.stringify (err));
 				cacheRecord.fingerprintError = err;
@@ -461,8 +471,8 @@ function Bastard (config) {
 					errorCode = 500;
 					errorMessage = "Internal error.";
 					console.error ("Problem serving " + filePath);
-					if (cacheRecordParam.fileError) console.error ("File error: " + JSON.stringify (fileError));
-					if (cacheRecordParam.fingerprintError) console.error ("Fingerprint error: " + JSON.stringify (fingerprintError));
+					if (cacheRecordParam.fileError) console.error ("File error: " + JSON.stringify (cacheRecordParam.fileError));
+					if (cacheRecordParam.fingerprintError) console.error ("Fingerprint error: " + JSON.stringify (cacheRecordParam.fingerprintError));
 				}
 				
 				if (errorHandler) {
