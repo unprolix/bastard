@@ -92,7 +92,7 @@ Limitations
 
 If the mime type for a file begins with "image/", it will not be gzipped.  All other files will be gzipped if the client indicates that it can understand gzipped data. This may not be the best choice for all file types.
 
-Does not do virtual hosting.
+Does not do virtual hosting. If you want virtual hosting, create a new Bastard object for each host.
 
 
 Project Status
