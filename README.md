@@ -11,7 +11,7 @@ CSS, Javascript, and HTML are minified. Files of other types are not modified, t
 Installing
 ==========
 
-	npm install bastard
+        npm install bastard
 
 
 Running Standalone
@@ -19,8 +19,8 @@ Running Standalone
 
 Configure the settings via npm. There are reasonable defaults but you definitely need to specify the base directory where your files are:
 
-    npm config bastard:base /path/with/good/intentions
-    npm start bastard
+        npm config bastard:base /path/with/good/intentions
+        npm start bastard
 
 If you are running the standalone server and want to programmatically find out the current fingerprint for a file, make a request for the file with an incorrect fingerprint such as "BASTARD". The server's response will contain the valid fingerprint, which you may then parse out and use in your own externally-generated HTML.
 
@@ -30,33 +30,33 @@ Running from your own code
 
 1. Create the bastard object:
 
-    var bastard = require ('bastard');
-    var Bastard = bastard.Bastard;
-    var bastardObj = new Bastard (config);
+        var bastard = require ('bastard');
+        var Bastard = bastard.Bastard;
+        var bastardObj = new Bastard (config);
 
-	// if you want to load every file into the cache before you get started:
-	bastardObj.loadEveryFile (callback);
+        // if you want to load every file into the cache before you get started:
+        bastardObj.preload (callback);
 
 2. Create your own HttpServer object and pass requests to it from within the associated handler:
 
-    var handled = bastardObj.possiblyHandleRequest (request, response);
+        var handled = bastardObj.possiblyHandleRequest (request, response);
 
-If the above function returns true, the request has been handled and you don't need to do anything else. Depending on how you want to structure your server, you can check bastard before or after your own URLs.
+   If the above function returns true, the request has been handled and you don't need to do anything else. Depending on how you want to structure your server, you can check bastard before or after your own URLs.
 
 
 3. To find out the current fingerprint of a file:
 
-    bastardObj.getFingerprint (filePath, basePath, callback);
+        bastardObj.getFingerprint (filePath, basePath, callback);
 
 	* filePath: full path to the file
 	* basePath: path to the file within the base directory (may be the same as the URL path for the file)
 	* callback: if present, will be called with the first argument being any error (or null) and the second argument being the fingerprint
 
-If callback is not present and the fingerprint is already known, it will be returned immediately as the result of the function call. If callback is not present and the fingerprint is not already known, the fingerprint will be internally calculated and null will be returned from the function call.
+   If callback is not present and the fingerprint is already known, it will be returned immediately as the result of the function call. If callback is not present and the fingerprint is not already known, the fingerprint will be internally calculated and null will be returned from the function call.
 
-You only need to specify one of filePath and basePath.
+   You only need to specify one of filePath and basePath.
 
-For an example of how to run bastard from your own code, examine the file start.js in the bastard package.
+   For an example of how to run bastard from your own code, examine the file start.js in the bastard package.
 
 
 Configuration
