@@ -30,10 +30,14 @@ function startBastard () {
 	};
 	var bastardObj = new bastard.Bastard (config);
 	
-	var host = process.env.npm_package_config_host;
-	var port = process.env.npm_package_config_port;
+	if (process.env.npm_package_config_preload == 'true') {
+		console.info ("Preloading cache....");
+		bastardObj.loadEveryFile (startListening);
+	} else {
+		startListening ();
+	}
 	
-	if (host == 'null' || host == '') host = null;
+	
 	
 	/*
 	function test () {
@@ -55,20 +59,26 @@ function startBastard () {
 		}
 	}
 	
-	var httpServer = http.createServer ();
-	httpServer.addListener ('request', webServerRequest);
-	httpServer.listen (port, host, function () {
-		if (host) console.log ('Server running at http://' + host + ':' + port + '/');
-		else console.log ('Server running at port ' + port + '.');
+	
+	function startListening () {
+		var host = process.env.npm_package_config_host;
+		var port = process.env.npm_package_config_port;
+		if (host == 'null' || host == '') host = null;
+		var httpServer = http.createServer ();
+		httpServer.addListener ('request', webServerRequest);
+
+		httpServer.listen (port, host, function () {
+			if (host) console.log ('Server running at http://' + host + ':' + port + '/');
+			else console.log ('Server running at port ' + port + '.');
 		
-		//test ();
+			//test ();
 		
-		process.once ('SIGINT', function () {
-			httpServer.close ();
-			bastardObj.cleanupForExit ();
-		});		
-	});
-    
+			process.once ('SIGINT', function () {
+				httpServer.close ();
+				bastardObj.cleanupForExit ();
+			});		
+		});
+    }
 }
 
 startBastard ();

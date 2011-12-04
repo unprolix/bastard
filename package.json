@@ -31,6 +31,7 @@
 		"port": 80,
 		"host": null,
 		"base": null,
+		"preload": false,
 		"debug": false,
 		"directories": false,
 		"rawURLPrefix": "/raw/",

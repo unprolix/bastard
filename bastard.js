@@ -1,4 +1,4 @@
-'use strict';
+	'use strict';
 
 var child_process = require ('child_process');
 var fs = require ('fs');
@@ -36,7 +36,7 @@ function minifyHTML (data) {
 var JSP = uglify.parser;
 var PRO = uglify.uglify;
 
-function minifyJavascript (data) {
+function minifyJavascript (data, filePath) {
 	try {
 		var ast = JSP.parse (data); // parse code and get the initial AST
 		ast = PRO.ast_mangle (ast); // get a new AST with mangled names
@@ -44,7 +44,14 @@ function minifyJavascript (data) {
 		return PRO.gen_code (ast); // compressed code here
 	}
 	catch (err) {
-		console.error ("Problem parsing/minifying Javascript: " + JSON.stringify(err));
+		// var keys = [];
+		// for (var key in err) { keys.push (key); }
+		// console.error ("Error keys: " + keys);
+		// console.error (err.stack);
+		// console.error (err.type);
+		// console.error (err.message);
+		// console.error (err.name);
+		console.error ("Problem parsing/minifying Javascript for " + filePath + ": " + err.message);
 		return "// Problem parsing Javascript -- see server logs\n" + data;
 	}
 }
@@ -296,7 +303,7 @@ function Bastard (config) {
 						} else {
 							// did not exist. this is fine; create it.
 							fs.mkdir (dir, 448 /* octal: 0700 */, function (err) {
-								if (err) {
+								if (err && err.code != 'EEXIST') { // an EEXIST means it was created in the meantime--acceptable
 									console.info ("Problem creating " + dir + ": " + err);
 								} else {
 									checkNextDir ();
@@ -338,6 +345,7 @@ function Bastard (config) {
 		var preprocessor = preprocessors[suffix];
 		var mimeType = mime.lookup (suffix);
 		var charset = mime.charsets.lookup (mimeType);
+		if (!charset && mimeType == 'application/javascript') charset = 'utf-8';
 		if (charset) {
 			cacheRecord.contentType = mimeType + '; charset=' + charset;
 			cacheRecord.charset = charset;
@@ -357,6 +365,7 @@ function Bastard (config) {
 			if (dataComplete && statComplete) prerequisitesComplete ();
 		});
 
+		console.info ("Reading " + filePath + " with charset: " + charset + " for mime type: " + mimeType);
 	    fs.readFile (filePath, charset, function (err, data) {
 	        if (err) {
 	            //console.log("Error from file " + filePath + ": " + err);
@@ -367,7 +376,7 @@ function Bastard (config) {
 				if (!basePath) basePath = filePath.substring (baseDir.length);
 				
 				// console.info ("Preprocessor: " + preprocessor);
-				cacheRecord.processed = (preprocessor) ? preprocessor (data) : data;
+				cacheRecord.processed = (preprocessor) ? preprocessor (data, filePath) : data;
 				writeCacheData (me.processedFileCacheDir + basePath, cacheRecord.processed);
 				
 				if (cacheRecord.contentType && cacheRecord.contentType.indexOf ('image/') != 0) {
@@ -593,7 +602,29 @@ function Bastard (config) {
 	
 	me.loadEveryFile = function (callback) {
 		var callbackOK = callback instanceof Function;
-		if (callbackOK) callback ("Not yet implemented");
+		
+		function walk (dir, callback) {
+			fs.readdir (dir, function (err, list) {
+				if (err) return callback (err);
+				var pending = list.length;
+				if (!pending) return callback (null);
+					list.forEach (function (file) {
+					file = dir + '/' + file;
+					fs.stat (file, function (err, stat) {
+						if (stat && stat.isDirectory ()) {
+							walk (file, function (err, res) {
+								if (!--pending) callback (null);
+							});
+						} else {
+							prepareCacheForFile (file, null, function (err, cacheRecord) {
+								if (!--pending) callback (null);
+							});
+						}
+					});
+				});
+			});
+		};
+		walk (baseDir, callback);
 	}
 	
 	me.cleanupForExit = function (tellMeWhenDone, eventName) {
