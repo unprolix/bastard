@@ -5,7 +5,7 @@ The purpose of bastard is to serve static content over the web quickly, accordin
 
 Additionally, bastard will automatically generate cryptographic fingerprints for all files it serves. You can programmatically ask it for the current fingerprinted URL for a file so that you can use that URL in HTML you generate external to the server. When bastard serves fingerprinted files, they are served with very long cache times because those URLs should always serve the same content.
 
-Both CSS and Javascript are minified, and HTML will probably be added soon. Files of other types are not touched, though they will be compressed if they're not image files. (Image files are never gzipped by this software.)
+CSS, Javascript, and HTML are minified. Files of other types are not modified, though they will be compressed for transmission if they're not image files. (Image files are never compressed by this software.) Note that in some cases, HTML minification can cause problems. In bastard, the HTML minification is not extremely aggressive and so will probably be fine. You can turn it off with a future config option if you are worried or actually find a problem in practice.
 
 
 Installing
@@ -82,7 +82,7 @@ directories	If true, will generate directory listings. (Not yet implemented.) (D
 
 
 
-Note that first the raw prefix is checked, then the fingerprint prefix, and then only the regular prefix--and the first match is considered to be definitive. This means that with the default values, if you have a directory called "raw" in your base directory, those files will never be served.
+Note that first the raw prefix is checked, then the fingerprint prefix, and then only the regular prefix--and the first match is considered to be definitive. This means that with the default values, if you have a directory called "raw" in your base directory, those files will never be served except as raw or fingerprinted.
 
 
 Limitations
@@ -99,6 +99,14 @@ Project Status
 This is a project built by the author for his own use. Contributions are welcomed.
 
 The public repository for the project is found at: https://github.com/unprolix/bastard
+
+Future features:
+
+* Ability to use an API, instead of the filesystem, as the source of files to be served. This would allow serving data from (e.g.) key/value stores.
+
+* Ability to use an API to upload files from base directory to a key/value store--including fingerprinted URLs. This would allow bastard to front for a CDN.
+
+
 
 
 License
