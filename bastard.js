@@ -1,5 +1,6 @@
 	'use strict';
 
+var events = require ('events');
 var child_process = require ('child_process');
 var fs = require ('fs');
 var uglify = require ("uglify-js");
@@ -75,6 +76,8 @@ function gzip (data) {
 
 
 function Bastard (config) {
+	var me = this;
+
 	var baseDir = config.base;
 	var errorHandler = config.errorHandler;
 	var storageDir = config.workingDir || '/tmp/bastard.dat';
@@ -82,15 +85,14 @@ function Bastard (config) {
 	var urlPrefix = config.urlPrefix;
 	var rawURLPrefix = config.rawURLPrefix;
 	var fingerprintURLPrefix = config.fingerprintURLPrefix;
-	
 	if (baseDir.charAt (baseDir.length-1) != '/') baseDir += '/';
 	
+	me._emitter = new events.EventEmitter ();
 	setupStorageDir ();
 	
 	// console.info ("*** " + config.workingDir);
 	// console.info ("*** " + storageDir);
 	
-	var me = this;
 	var CACHE_INFO_FILENAME = 'cache_info.json';
 	var cacheData = {};
 	if (errorHandler && !(errorHandler instanceof Function)) errorHandler = null;
@@ -102,6 +104,7 @@ function Bastard (config) {
 	};
 
 	var ONE_WEEK = 60 * 60 * 24 * 7;
+	var ONE_YEAR = 60 * 60 * 24 * 365;
 
 	function formatCacheRecord (cacheRecord) {
 		var keys = [];
@@ -121,14 +124,26 @@ function Bastard (config) {
 
 
 	function setupStorageDir () {
+		function checkSetupComplete () {
+			// console.info ("Setup complete?");
+			if (me.ready) return;
+			if (!me.processedFileCacheDir) return;
+			if (!me.gzippedFileCacheDir) return;
+			if (me.loadingOldCache) return;
+			// console.info ("Setup is complete");
+			// console.info (cacheData);
+			me._emitter.emit ('ready');
+			me.ready = true;
+		}
+		
 		fs.stat (storageDir, function (err, statobj) {
 			if (err) {
 				if (err.code == 'ENOENT') {
-					console.info ("Storage dir does not exist yet.");
+					//console.info ("Storage dir does not exist yet.");
 					// does not exist. can we make it?
 					fs.mkdir (storageDir, 448 /* octal: 0700 */, function (exception) {
 						if (exception) throw exception;
-						console.info ("Created storage directory for processed file cache");
+						//console.info ("Created storage directory for processed file cache");
 						finishStorageDirSetup ();
 					});
 				} else {
@@ -143,38 +158,117 @@ function Bastard (config) {
 				}
 			}
 		});
+
+		function setupProcessedFileCacheDir () {
+			var processedFileCacheDir = me.storageDir + 'processed';
+			fs.stat (processedFileCacheDir, function (err, statobj) {
+				if (err) {
+					if (err.code == 'ENOENT') {
+						//console.info ("Processed file cache dir does not exist yet.");
+						// does not exist. can we make it?
+						fs.mkdir (processedFileCacheDir, 448 /* octal: 0700 */, function (exception) {
+							if (exception) throw exception;
+							//console.info ("Created directory for processed files");
+							finishSetup ();
+						});
+					} else {
+						throw 'Problem with processed file cache directory: ' + err.message;
+					}
+				} else {
+					if (!statobj.isDirectory ()) {
+						throw "Processed file cache directory is something I can't work with.";
+					} else {
+						// it is a directory already.
+						finishSetup ();
+					}
+				}
+			});
+
+			function finishSetup () {
+				processedFileCacheDir = fs.realpathSync (processedFileCacheDir);
+				if (processedFileCacheDir.charAt (processedFileCacheDir.length-1) != '/') processedFileCacheDir += '/';
+				me.processedFileCacheDir = processedFileCacheDir;
+				// console.info ("Using directory for cached processed files: " + processedFileCacheDir);
+				checkSetupComplete ();
+			}
+		}
+
+		function setupGzippedFileCacheDir () {
+			var gzippedFileCacheDir = me.storageDir + 'gzipped';
+			fs.stat (gzippedFileCacheDir, function (err, statobj) {
+				if (err) {
+					if (err.code == 'ENOENT') {
+						//console.info ("Gzipped file cache dir does not exist yet.");
+						// does not exist. can we make it?
+						fs.mkdir (gzippedFileCacheDir, 448 /* octal: 0700 */, function (exception) {
+							if (exception) throw exception;
+							//console.info ("Created directory for gzipped files");
+							finishSetup ();
+						});
+					} else {
+						throw 'Problem with gzipped file cache directory: ' + err.message;
+					}
+				} else {
+					if (!statobj.isDirectory ()) {
+						throw "Gzipped file cache directory is something I can't work with.";
+					} else {
+						// it is a directory already.
+						finishSetup ();
+					}
+				}
+			});
+
+			function finishSetup () {
+				gzippedFileCacheDir = fs.realpathSync (gzippedFileCacheDir);
+				if (gzippedFileCacheDir.charAt (gzippedFileCacheDir.length-1) != '/') gzippedFileCacheDir += '/';
+				me.gzippedFileCacheDir = gzippedFileCacheDir;
+				// console.info ("Using directory for cached gzipped files: " + gzippedFileCacheDir);
+				checkSetupComplete ();
+			}
+		}
+
 	
 		function loadOldCache (oldCache) {
+			//we have filepath -> rawSize, fingerprint, modified
+			// console.info ("Loading old cache");
+			var remaining = 0;
+			for (var filePath in oldCache) remaining++;
+			// console.info ("Will check record count: " + remaining);
 			function checkCacheRecord (path, record) {
 				// compare size and modtime with the live ones from the file.
 				// if those are the same, we assume the fingerprint and cached processed/compressed files are still good.
 				// NOTE that this is vulnerable to sabotage or disk errors, etc.
 				
 				fs.stat (path, function (err, statObj) {
-					if (err) return;
-					// console.info ("* Rechecking file: " + path);
-					// console.info ("Stored size: " + record.rawSize);
-					// console.info ("  Live size: " + statObj.size);
-					if (record.rawSize != statObj.size) return;
-					var cacheWhen = Date.parse (record.modified);
-					//console.info ("Stored mtime: " + cacheWhen);
-					//console.info ("  Live mtime: " + statObj.mtime);
-					if (cacheWhen != statObj.mtime) return;
-					//console.info ("**** ELIGIBLE FOR REUSE");
-					record.reloaded = true;
-					cacheData[path] = record; // keep the info but load the data on demand only.
+					if (err) {
+						//console.warn ("Problem with file: " + path + ": " + err);
+					} else {
+						// console.info ("* Rechecking file: " + path);
+						// console.info ("Stored size: " + record.rawSize);
+						// console.info ("  Live size: " + statObj.size);
+						if (record.rawSize != statObj.size) return;
+						var cacheWhen = Date.parse (record.modified);
+						//console.info ("Stored mtime: " + cacheWhen);
+						//console.info ("  Live mtime: " + statObj.mtime);
+						if (cacheWhen != statObj.mtime) return;
+						//console.info ("**** ELIGIBLE FOR REUSE");
+						record.reloaded = true;
+						cacheData[path] = record; // keep the info but load the data on demand only.
+					}
+					remaining--;
+					if (remaining <= 0) {
+						//console.info ("Checked all records.");
+						delete me.loadingOldCache;
+						checkSetupComplete ();
+					}
 				});
 			}
-			
-			
-			//we have filepath -> rawSize, fingerprint, modified
+		
 			for (var filePath in oldCache) {
 				if (filePath.indexOf (baseDir) != 0) continue; // not in our current purview
 				var cacheRecord = oldCache[filePath];
 				checkCacheRecord (filePath, cacheRecord);
 			}
-			
-			
 		}
 	
 	
@@ -185,10 +279,13 @@ function Bastard (config) {
 			// console.info ("Using working directory: " + storageDir);
 		
 			me.cacheInfoFilePath = me.storageDir + CACHE_INFO_FILENAME;
+			me.loadingOldCache = true;
 
 			fs.readFile (me.cacheInfoFilePath, 'utf8', function (err, data) {
 				if (err) {
-					//console.warn ("Could not reload cache info.");
+					console.warn ("Could not reload cache info: " + err);
+					delete me.loadingOldCache;
+					checkSetupComplete ();
 					return;
 				}
 				try {
@@ -197,82 +294,18 @@ function Bastard (config) {
 				}
 				catch (err) {
 					console.warn ("Could not parse reloaded cache info");
+					delete me.loadingOldCache;
+					checkSetupComplete ();
 				}
 				
 			});
 
+			// console.info ("Setting up subdirs");
 			setupProcessedFileCacheDir ();
 			setupGzippedFileCacheDir ();
-
-			// TODO: read the cache info file		
 		}
 	}
 
-	function setupProcessedFileCacheDir () {
-		var processedFileCacheDir = me.storageDir + 'processed';
-		fs.stat (processedFileCacheDir, function (err, statobj) {
-			if (err) {
-				if (err.code == 'ENOENT') {
-					console.info ("Processed file cache dir does not exist yet.");
-					// does not exist. can we make it?
-					fs.mkdir (processedFileCacheDir, 448 /* octal: 0700 */, function (exception) {
-						if (exception) throw exception;
-						console.info ("Created directory for processed files");
-						finishSetup ();
-					});
-				} else {
-					throw 'Problem with processed file cache directory: ' + err.message;
-				}
-			} else {
-				if (!statobj.isDirectory ()) {
-					throw "Processed file cache directory is something I can't work with.";
-				} else {
-					// it is a directory already.
-					finishSetup ();
-				}
-			}
-		});
-		
-		function finishSetup () {
-			processedFileCacheDir = fs.realpathSync (processedFileCacheDir);
-			if (processedFileCacheDir.charAt (processedFileCacheDir.length-1) != '/') processedFileCacheDir += '/';
-			me.processedFileCacheDir = processedFileCacheDir;
-			// console.info ("Using directory for cached processed files: " + processedFileCacheDir);
-		}
-	}
-
-	function setupGzippedFileCacheDir () {
-		var gzippedFileCacheDir = me.storageDir + 'gzipped';
-		fs.stat (gzippedFileCacheDir, function (err, statobj) {
-			if (err) {
-				if (err.code == 'ENOENT') {
-					console.info ("Gzipped file cache dir does not exist yet.");
-					// does not exist. can we make it?
-					fs.mkdir (gzippedFileCacheDir, 448 /* octal: 0700 */, function (exception) {
-						if (exception) throw exception;
-						console.info ("Created directory for gzipped files");
-						finishSetup ();
-					});
-				} else {
-					throw 'Problem with gzipped file cache directory: ' + err.message;
-				}
-			} else {
-				if (!statobj.isDirectory ()) {
-					throw "Gzipped file cache directory is something I can't work with.";
-				} else {
-					// it is a directory already.
-					finishSetup ();
-				}
-			}
-		});
-		
-		function finishSetup () {
-			gzippedFileCacheDir = fs.realpathSync (gzippedFileCacheDir);
-			if (gzippedFileCacheDir.charAt (gzippedFileCacheDir.length-1) != '/') gzippedFileCacheDir += '/';
-			me.gzippedFileCacheDir = gzippedFileCacheDir;
-			// console.info ("Using directory for cached gzipped files: " + gzippedFileCacheDir);
-		}
-	}
 
 	function prepareCacheForFile (filePath, basePath, callback) {
 		var cacheRecord = {};
@@ -436,6 +469,7 @@ function Bastard (config) {
 			
 			
 			function refillCacheRecord (gzip) {
+				console.info ("Attempting to refill cache record: " + cacheRecordParam);
 				delete cacheRecordParam.reloaded;
 				if (gzip) {
 					fs.readFile (me.gzippedFileCacheDir + basePath + '.gz', null, function (err, fileData) {
@@ -459,6 +493,7 @@ function Bastard (config) {
 			var data = (gzipOK && cacheRecordParam.gzip) ? cacheRecordParam.gzip : cacheRecordParam.processed;
 			
 			if (!data) {
+				console.warn ("No data for " + basePath);
 				if (cacheRecordParam.reloaded && !isRefill) { // if it is a reloaded record and we haven't tried yet
 					refillCacheRecord (gzipOK);
 					return;
@@ -511,7 +546,8 @@ function Bastard (config) {
 				response.writeHead (304, {});
 				response.end ();
 			} else {
-				serveDataWithEncoding (response, data, cacheRecordParam.contentType, gzipOK ? 'gzip' : null, modificationTime, cacheRecordParam.fingerprint, ONE_WEEK);
+				var cacheTime = fingerprint ? ONE_YEAR : ONE_WEEK;
+				serveDataWithEncoding (response, data, cacheRecordParam.contentType, gzipOK ? 'gzip' : null, modificationTime, cacheRecordParam.fingerprint, cacheTime);
 			}
 		}
 
@@ -576,7 +612,7 @@ function Bastard (config) {
 			var basePath = request.url.substring (urlPrefixLen);
 			
 			var filePath = baseDir + basePath;
-			// console.info ("    filePath: " + filePath);
+			//console.info ("    filePath: " + filePath);
 			var acceptEncoding = request.headers['accept-encoding'];
 			var gzipOK = acceptEncoding && (acceptEncoding.split(',').indexOf ('gzip') >= 0);
 			var ifModifiedSince = request.headers['if-modified-since']; // fingerprinted files are never modified, so what do we do here?
@@ -600,7 +636,10 @@ function Bastard (config) {
 		}	
 	}
 	
-	me.loadEveryFile = function (callback) {
+	me.preload = function (callback) {
+		// Make it so that no overly-expensive operations will happen during a client request.
+		// Reading data from disk is ok, but not calculating fingerprints.
+		
 		var callbackOK = callback instanceof Function;
 		
 		function walk (dir, callback) {
@@ -616,15 +655,28 @@ function Bastard (config) {
 								if (!--pending) callback (null);
 							});
 						} else {
-							prepareCacheForFile (file, null, function (err, cacheRecord) {
+							var cacheRecord = cacheData[file];
+							if (cacheRecord) {
+								//console.info ("Cache record exists for: " + file);
 								if (!--pending) callback (null);
-							});
+							} else {
+								prepareCacheForFile (file, null, function (err, cacheRecord) {
+									if (!--pending) callback (null);
+								});
+							}
 						}
 					});
 				});
 			});
 		};
-		walk (baseDir, callback);
+		
+		if (me.ready) {
+			walk (baseDir.substring (0, baseDir.length-1), callback);
+		} else {
+			me._emitter.once ('ready', function () {
+				walk (baseDir.substring (0, baseDir.length-1), callback);				
+			});
+		}
 	}
 	
 	me.cleanupForExit = function (tellMeWhenDone, eventName) {

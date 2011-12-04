@@ -32,7 +32,7 @@ function startBastard () {
 	
 	if (process.env.npm_package_config_preload == 'true') {
 		console.info ("Preloading cache....");
-		bastardObj.loadEveryFile (startListening);
+		bastardObj.preload (startListening);
 	} else {
 		startListening ();
 	}
