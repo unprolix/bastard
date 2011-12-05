@@ -55,7 +55,7 @@ function startBastard () {
 		if (!handled) {
 			console.warn ("Request not handled by bastard: " + request.method + " " + request.url);
 			response.writeHead (404, {
-				'Server': 'bastard/0.5.6',
+				'Server': 'bastard/0.5.7',
 				'Content-Type': 'text/plain; charset=utf-8'
 			});
             response.end ("Not found.");
