@@ -41,7 +41,7 @@ Running from your own code
 
         var handled = bastardObj.possiblyHandleRequest (request, response);
 
-> If the above function returns true, the request has been handled and you don't need to do anything else. Depending on how you want to structure your server, you can check bastard before or after your own URLs.
+If the above function returns true, the request has been handled and you don't need to do anything else. Depending on how you want to structure your server, you can check bastard before or after your own URLs.
 
 
 To find out the current fingerprint of a file
@@ -49,9 +49,9 @@ To find out the current fingerprint of a file
 
         bastardObj.getFingerprint (filePath, basePath, function (err, fingerprint) {});
 
-        * `filePath`: full path to the file
-        * `basePath`: path to the file within the base directory (may be the same as the URL path for the file)
-        * `callback`: if present, will be called with the first argument being any error (or null) and the second argument being the fingerprint
+    * `filePath`: full path to the file
+    * `basePath`: path to the file within the base directory (may be the same as the URL path for the file)
+    * `callback`: if present, will be called with the first argument being any error (or null) and the second argument being the fingerprint
 
 If callback is not present and the fingerprint is already known, it will be returned immediately as the result of the function call. If callback is not present and the fingerprint is not already known, the fingerprint will be internally calculated and null will be returned from the function call.
 
