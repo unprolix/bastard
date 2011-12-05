@@ -4,8 +4,9 @@
 
 var fs = require ('fs');
 
-var PACKAGE_DIR = arguments[4] + '/';
-var PACKAGE_FILE = PACKAGE_DIR + 'package.json';
+var PACKAGE_DIR = fs.realpathSync (arguments[4]);
+var PACKAGE_FILE = PACKAGE_DIR + '/' + 'package.json';
+var THIS_FILE = fs.realpathSync (arguments[3]);
 
 function currentVersion () {
 	try {
@@ -17,15 +18,20 @@ function currentVersion () {
 	}
 }
 
-var RE = new RegExp ('bastard/\\d\.\\d\.\\d');
+var RE = new RegExp ('bastard/\\d*\.\\d*\.\\d*', 'g');
 var VERSION = currentVersion ();
 
-function performReplacement (file) {
+function performReplacement (file, callback) {
 	var data = fs.readFileSync (file, 'utf8');
 	var modifiedData = data.replace (RE, 'bastard/' + VERSION);
 	if (data != modifiedData) {
-		fs.writeFileSync (file, data, 'utf8');
-		console.info ("Updated file: " + file);		
+		fs.writeFile (file, modifiedData, 'utf8', function (err) {
+			if (err) console.error ("Problem updating " + file + ": " + err);
+			else console.info ("Updated file: " + file);
+			callback ();
+		});
+	} else {
+		callback ();
 	}
 }
 
@@ -36,16 +42,19 @@ function replaceInFiles (callback) {
 		if (err) return callback (err);
 		var remaining = list.length;
 		list.forEach (function (file) {
-			if (!(file.lastIndexOf ('.js') == file.length - 3)) {
+			file = dir + '/' + file;
+			if (!(file.lastIndexOf ('.js') == file.length - 3) || file == THIS_FILE) {
 				if (--remaining <= 0) callback ();
 				return;
 			}
-			file = dir + '/' + file;
 			fs.stat (file, function (err, stat) {
 				if (stat && stat.isFile ()) {
-					performReplacement (file);
+					performReplacement (file, function () {
+						if (--remaining <= 0) callback ();						
+					});
+				} else {
+					if (--remaining <= 0) callback ();
 				}
-				if (--remaining <= 0) callback ();
 			});
 		});
 	});
