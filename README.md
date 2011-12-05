@@ -62,32 +62,37 @@ Running from your own code
 Configuration
 =============
 
-The following configuration variables may be set with `npm config bastard:xxx yyy` where `xxx` is the name of the parameter and `yyy` is the desired value. More help on configuration variables may be obtained via `npm`. These configuration variables are used exclusively by the built-in standalone server and are ignored by the `Bastard()` objects themselves.
+The following configuration variables may be set with `npm config bastard:xxx yyy` where `xxx` is the name of the parameter and `yyy` is the desired value. More help on configuration variables may be obtained via `npm`. These variables also correspond to keys which may be present in single argument to the `Bastard` object's constructor. (In the constructor, however, the URL patterns all default to null--that is, not checked.)
 
+Note that there are some not-too-complicated subtleties in URL matching.  The raw prefix, if defined, is checked first, followed by the fingerprint prefix (if defined), and then only the regular prefix (if defined)--and the first match is considered to be definitive. This means that with the default values provided in the standalone server, if you have a directory called "raw" in your base directory, those files will never be served except as raw or fingerprinted.
+
+
+`base`    Directory where files to be served reside. (Default: empty)
+
+`rawURLPrefix`  The prefix for URLs from which raw files should be served. These will be just as they are on disk: not minified, not compressed. (Default: /raw/)
+
+`fingerprintURLPrefix`  The prefix for URLs from which fingerprinted files should be served. The fingerprint will appear in the URLs after this prefix followed by the relative pathname to the file in the base directory. (Default: /f/)
+
+`urlPrefix` The prefix for URLs from which non-fingerprinted files should be served. (Default: /)
+
+`workingDir`  The location for temporary files to be kept. This includes on-disk copies of minified and compressed files that originate in the base directory. (Default: /tmp/bastard.dat)
+
+`debug` If true, turns on some debugging functionality. (Default: false)
+
+`directories` If true, will generate directory listings. (Not yet implemented.) (Default: false)
+
+
+Standalone Server
+-----------------
+
+In addition, the following configuration parameters are used by the standalone server:
 
 `host`	Hostname or IP address at which to listen. If empty, will bind to all available IP addresses. (Default: empty)
 
 `port`	Port number at which to listen. (Default: 80)
 
-`base`    Directory where files to be served reside. (Default: empty)
-
-`rawURLPrefix`	The prefix for URLs from which raw files should be served. These will be just as they are on disk: not minified, not compressed. (Default: /raw/)
-
-`fingerprintURLPrefix`	The prefix for URLs from which fingerprinted files should be served. The fingerprint will appear in the URLs after this prefix followed by the relative pathname to the file in the base directory. (Default: /f/)
-
-`urlPrefix`	The prefix for URLs from which non-fingerprinted files should be served. (Default: /)
-
-`workingDir`	The location for temporary files to be kept. This includes on-disk copies of minified and compressed files that originate in the base directory. (Default: /tmp/bastard.dat)
-
 `preload`	If true, a cache record will be created for each available file before the server begins. This will not load all data from disk, but will calculate all new fingerprints necessary.
 
-`debug`	If true, turns on some debugging functionality. (Default: false)
-
-`directories`	If true, will generate directory listings. (Not yet implemented.) (Default: false)
-
-
-
-Note that first the raw prefix is checked, then the fingerprint prefix, and then only the regular prefix--and the first match is considered to be definitive. This means that with the default values, if you have a directory called "raw" in your base directory, those files will never be served except as raw or fingerprinted.
 
 
 Limitations
