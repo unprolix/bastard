@@ -70,6 +70,7 @@ function gzip (data) {
 	var percent = Math.floor ((result.length * 100 / data.length) * 100 + 0.5)/100;
 	console.info ("Compression: " + data.length + " -> " + result.length + ' (' + percent + '%)');
 
+	// TODO: don't return compressed version if it's bigger. (need two return values: format and result)
 	return result;
 }
 
@@ -125,12 +126,15 @@ function Bastard (config) {
 
 	function setupStorageDir () {
 		function checkSetupComplete () {
-			// console.info ("Setup complete?");
+			if (debug) console.info ("Setup complete?");
 			if (me.ready) return;
+			if (debug) console.info ("Checking processedFileCacheDir");
 			if (!me.processedFileCacheDir) return;
+			if (debug) console.info ("Checking gzippedFileCacheDir");
 			if (!me.gzippedFileCacheDir) return;
+			if (debug) console.info ("Checking loadingOldCache");
 			if (me.loadingOldCache) return;
-			// console.info ("Setup is complete");
+			if (debug) console.info ("Setup is complete");
 			// console.info (cacheData);
 			me._emitter.emit ('ready');
 			me.ready = true;
@@ -241,19 +245,22 @@ function Bastard (config) {
 				
 				fs.stat (path, function (err, statObj) {
 					if (err) {
-						//console.warn ("Problem with file: " + path + ": " + err);
+						if (debug) console.warn ("Problem with file: " + path + ": " + err);
 					} else {
-						// console.info ("* Rechecking file: " + path);
-						// console.info ("Stored size: " + record.rawSize);
-						// console.info ("  Live size: " + statObj.size);
-						if (record.rawSize != statObj.size) return;
-						var cacheWhen = Date.parse (record.modified);
-						//console.info ("Stored mtime: " + cacheWhen);
-						//console.info ("  Live mtime: " + statObj.mtime);
-						if (cacheWhen != statObj.mtime) return;
-						//console.info ("**** ELIGIBLE FOR REUSE");
-						record.reloaded = true;
-						cacheData[path] = record; // keep the info but load the data on demand only.
+						if (debug) {
+							console.info ("* Rechecking file: " + path);
+							 console.info ("Stored size: " + record.rawSize);
+							 console.info ("  Live size: " + statObj.size);
+						}
+						if (record.rawSize == statObj.size) {
+							var cacheWhen = Date.parse (record.modified);
+							//console.info ("Stored mtime: " + cacheWhen);
+							//console.info ("  Live mtime: " + statObj.mtime);
+							if (cacheWhen != statObj.mtime) return;
+							//console.info ("**** ELIGIBLE FOR REUSE");
+							record.reloaded = true;
+							cacheData[path] = record; // keep the info but load the data on demand only.
+						}
 					}
 					remaining--;
 					if (remaining <= 0) {
@@ -436,9 +443,9 @@ function Bastard (config) {
 	}
 	
 	// NOTE: does this work for binary data? it should....
-	function serveDataWithEncoding (response, data, contentType, encoding, modificationTime, fingerprint, maxAgeInSeconds) {
+	function serveDataWithEncoding (response, data, contentType, charset, encoding, modificationTime, fingerprint, maxAgeInSeconds) {
 		var responseHeaders = {
-			'Content-Length': data.length,
+			'Content-Length': data ? data.length : 0,
 	        'Content-Type': contentType,
 			'Vary': 'Accept-Encoding',
 	        'Cache-Control': "max-age=" + maxAgeInSeconds,
@@ -448,10 +455,10 @@ function Bastard (config) {
 		if (modificationTime) responseHeaders['Last-Modified'] = modificationTime;
 		if (fingerprint) responseHeaders['Etag'] = fingerprint;
 	    response.writeHead (200, responseHeaders);
-	    response.end (data, null /*'utf8'*/);
+	    response.end (data, charset);
 	}
 
-	function serve (response, filePath, basePath, fingerprint, gzipOK, ifModifiedSince) {
+	function serve (response, filePath, basePath, fingerprint, gzipOK, ifModifiedSince, headOnly) {
 		// console.info ("Serving " + basePath + ' out of ' + filePath);
 		var cacheRecord = cacheData[filePath];
 
@@ -493,7 +500,7 @@ function Bastard (config) {
 			
 			var data = (gzipOK && cacheRecordParam.gzip) ? cacheRecordParam.gzip : cacheRecordParam.processed;
 			
-			if (!data) {
+			if (data ==null && !headOnly) {
 				// console.warn ("No data for " + basePath);
 				if (cacheRecordParam.reloaded && !isRefill) { // if it is a reloaded record and we haven't tried yet
 					refillCacheRecord (gzipOK);
@@ -512,10 +519,15 @@ function Bastard (config) {
 				if (cacheRecordParam.fileError && cacheRecordParam.fileError.code == 'ENOENT') {
 					errorCode = 404;
 					errorMessage = "File not found.";
+				} else if (cacheRecordParam.fileError && cacheRecordParam.fileError.code == 'EACCES') {
+					errorCode = 403;
+					errorMessage = "Forbidden.";
 				} else {
 					errorCode = 500;
 					errorMessage = "Internal error.";
 					console.error ("Problem serving " + filePath);
+					console.info (cacheRecordParam.fileError);
+					console.info (cacheRecordParam.fingerprintError);
 					if (cacheRecordParam.fileError) console.error ("File error: " + JSON.stringify (cacheRecordParam.fileError));
 					if (cacheRecordParam.fingerprintError) console.error ("Fingerprint error: " + JSON.stringify (cacheRecordParam.fingerprintError));
 				}
@@ -547,8 +559,24 @@ function Bastard (config) {
 				response.writeHead (304, {'Server': 'bastard/0.5.6'});
 				response.end ();
 			} else {
-				var cacheTime = fingerprint ? ONE_YEAR : ONE_WEEK;
-				serveDataWithEncoding (response, data, cacheRecordParam.contentType, gzipOK ? 'gzip' : null, modificationTime, cacheRecordParam.fingerprint, cacheTime);
+				if (headOnly) {
+					if (cacheRecordParam.fileError) {
+						console.info ("FILE ERROR:");
+						console.info (cacheRecordParam.fileError);
+						var errorMessage = "Not found.";
+						if (errorHandler) {
+							errorHandler (response, 404, errorMessage);
+						} else {
+						    response.writeHead (404, {'Content-Type': 'text/plain; charset=utf-8', 'Server': 'bastard/0.5.6'});
+						    response.end (errorMessage, 'utf8');
+						}
+					} else {
+						serveDataWithEncoding (response, null, cacheRecordParam.contentType, cacheRecordParam.charset, null, modificationTime, cacheRecordParam.fingerprint, null);						
+					}
+				} else {
+					var cacheTime = fingerprint ? ONE_YEAR : ONE_WEEK;
+					serveDataWithEncoding (response, headOnly ? '' : data, cacheRecordParam.contentType, cacheRecordParam.charset, gzipOK ? 'gzip' : null, modificationTime, cacheRecordParam.fingerprint, cacheTime);
+				}
 			}
 		}
 
@@ -606,7 +634,8 @@ function Bastard (config) {
 			var acceptEncoding = request.headers['accept-encoding'];
 			var gzipOK = acceptEncoding && (acceptEncoding.split(',').indexOf ('gzip') >= 0);
 			var ifModifiedSince = request.headers['if-modified-since']; // fingerprinted files are never modified, so what do we do here?
-			serve (response, filePath, basePath, fingerprint, gzipOK, ifModifiedSince);
+			var headOnly = request.method == 'HEAD';
+			serve (response, filePath, basePath, fingerprint, gzipOK, ifModifiedSince, headOnly);
 			return true;
 		}
 		if (request.url.indexOf (urlPrefix) == 0) {
@@ -617,7 +646,8 @@ function Bastard (config) {
 			var acceptEncoding = request.headers['accept-encoding'];
 			var gzipOK = acceptEncoding && (acceptEncoding.split(',').indexOf ('gzip') >= 0);
 			var ifModifiedSince = request.headers['if-modified-since']; // fingerprinted files are never modified, so what do we do here?
-			serve (response, filePath, basePath, null, gzipOK, ifModifiedSince);
+			var headOnly = request.method == 'HEAD';
+			serve (response, filePath, basePath, null, gzipOK, ifModifiedSince, headOnly);
 			return true;
 		}
 		// console.info ("NO MATCH: " + request.url);
