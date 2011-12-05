@@ -3,9 +3,9 @@ BASTARD
 
 The purpose of bastard is to serve static content over the web quickly, according to best practices, in a way that is easy to set up, run, and administer. It is implemented as a module intended to be run from within node.js. It may be invoked as part of another server process, serving only URLs with a given set of prefixes, or it may be the entire server all on its own. It will automatically minify and compress data, cache the data on disk, and verify the validity of its cached data on startup. While running, it keeps cached data in memory and does not expire data from the cache. Restarts should be relatively quick and easy because minified/compressed data will be read from the disk cache on the first request for that item.
 
-Additionally, bastard will automatically generate cryptographic fingerprints for all files it serves. You can programmatically ask it for the current fingerprinted URL for a file so that you can use that URL in HTML you generate external to the server. When bastard serves fingerprinted files, they are served with very long cache times because those URLs should always serve the same content.
+Additionally, bastard will automatically generate cryptographic fingerprints for all files it serves, and return this fingerprint as the value of the Etag header in its responses. Files are available at fingerprinted URLs so that they can be cached indefinitely by client browsers. You can programmatically ask it for the current fingerprinted URL for a file so that you can use that URL in HTML you generate external to the server. When bastard serves fingerprinted files, they are served with very long cache times because those URLs should always serve the same content.
 
-CSS, Javascript, and HTML are minified. Files of other types are not modified, though they will be compressed for transmission if they're not image files. (Image files are never compressed by this software.) Note that in some cases, HTML minification can cause problems. In bastard, the HTML minification is not extremely aggressive and so will probably be fine. You can turn it off with a future config option if you are worried or actually find a problem in practice.
+CSS, Javascript, and HTML are minified. Files of other types are not modified, though they will be compressed for transmission if they're not image files. (Image files are never compressed by this software.) Note that in some rare cases, HTML minification can cause problems. In bastard, the HTML minification is not extremely aggressive and so will probably be fine. You can turn it off with a future config option if you are worried or actually find a problem in practice.
 
 
 Installing
@@ -62,7 +62,7 @@ Running from your own code
 Configuration
 =============
 
-The following configuration variables may be set with `npm config bastard:xxx yyy` where `xxx` is the name of the parameter and `yyy` is the desired value. More help on configuration variables may be obtained via `npm`.
+The following configuration variables may be set with `npm config bastard:xxx yyy` where `xxx` is the name of the parameter and `yyy` is the desired value. More help on configuration variables may be obtained via `npm`. These configuration variables are used exclusively by the built-in standalone server and are ignored by the `Bastard()` objects themselves.
 
 
  `host`	Hostname or IP address at which to listen. If empty, will bind to all available IP addresses. (Default: empty)
