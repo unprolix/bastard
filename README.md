@@ -65,7 +65,7 @@ Configuration
 The following configuration variables may be set with `npm config bastard:xxx yyy` where `xxx` is the name of the parameter and `yyy` is the desired value. More help on configuration variables may be obtained via `npm`. These configuration variables are used exclusively by the built-in standalone server and are ignored by the `Bastard()` objects themselves.
 
 
- `host`	Hostname or IP address at which to listen. If empty, will bind to all available IP addresses. (Default: empty)
+`host`	Hostname or IP address at which to listen. If empty, will bind to all available IP addresses. (Default: empty)
 
 `port`	Port number at which to listen. (Default: 80)
 
@@ -75,7 +75,7 @@ The following configuration variables may be set with `npm config bastard:xxx yy
 
 `fingerprintURLPrefix`	The prefix for URLs from which fingerprinted files should be served. The fingerprint will appear in the URLs after this prefix followed by the relative pathname to the file in the base directory. (Default: /f/)
 
-`urlPrefix`	The prefix for URLs from which non-fingerprinted files should be served.
+`urlPrefix`	The prefix for URLs from which non-fingerprinted files should be served. (Default: /)
 
 `workingDir`	The location for temporary files to be kept. This includes on-disk copies of minified and compressed files that originate in the base directory. (Default: /tmp/bastard.dat)
 
