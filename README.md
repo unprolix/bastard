@@ -46,7 +46,7 @@ Running from your own code
 
 3. To find out the current fingerprint of a file:
 
-        bastardObj.getFingerprint (filePath, basePath, callback);
+        bastardObj.getFingerprint (filePath, basePath, function (err, fingerprint) {});
 
 	* `filePath`: full path to the file
 	* `basePath`: path to the file within the base directory (may be the same as the URL path for the file)
@@ -57,6 +57,12 @@ Running from your own code
    You only need to specify one of filePath and basePath.
 
    For an example of how to run bastard from your own code, examine the file start.js in the bastard package.
+
+4. To preload the entire base directory:
+
+        bastardObj.preload (function (err) {});
+
+   Calling this function and waiting until the callback is invoked will ensure that all fingerprints have been precalculated before any user requests are seen. It does not load all files into memory, but does load all information about each file, and ensure that each file has been minified (where possible) and compressed (when appropriate).
 
 
 Configuration
@@ -85,7 +91,7 @@ Note that there are some not-too-complicated subtleties in URL matching.  The ra
 Standalone Server
 -----------------
 
-In addition, the following configuration parameters are used by the standalone server:
+In addition, the following configuration parameters are used only by the standalone server and do not correspond to constructor arguments:
 
 `host`	Hostname or IP address at which to listen. If empty, will bind to all available IP addresses. (Default: empty)
 
