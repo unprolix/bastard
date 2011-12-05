@@ -435,23 +435,19 @@ function Bastard (config) {
 		});
 	}
 	
-	function writeHead (response, statusCode, headers) {
-		headers['Server'] = 'bastard/0.5.5';
-		response.writeHead (statusCode, headers);
-	}
-
 	// NOTE: does this work for binary data? it should....
 	function serveDataWithEncoding (response, data, contentType, encoding, modificationTime, fingerprint, maxAgeInSeconds) {
 		var responseHeaders = {
 			'Content-Length': data.length,
 	        'Content-Type': contentType,
 			'Vary': 'Accept-Encoding',
-	        'Cache-Control': "max-age=" + maxAgeInSeconds
+	        'Cache-Control': "max-age=" + maxAgeInSeconds,
+			'Server': 'bastard/0.5.6'
 		};
 		if (encoding) responseHeaders['Content-Encoding'] = encoding;
 		if (modificationTime) responseHeaders['Last-Modified'] = modificationTime;
 		if (fingerprint) responseHeaders['Etag'] = fingerprint;
-	    writeHead (response, 200, responseHeaders);
+	    response.writeHead (200, responseHeaders);
 	    response.end (data, null /*'utf8'*/);
 	}
 
@@ -527,7 +523,7 @@ function Bastard (config) {
 				if (errorHandler) {
 					errorHandler (response, errorCode, errorMessage);
 				} else {
-				    writeHead (response, errorCode, {'Content-Type': 'text/plain; charset=utf-8'});
+				    response.writeHead (errorCode, {'Content-Type': 'text/plain; charset=utf-8', 'Server': 'bastard/0.5.6'});
 				    response.end (errorMessage, 'utf8');
 				}
 				return;
@@ -540,7 +536,7 @@ function Bastard (config) {
 				if (errorHandler) {
 					errorHandler (response, 404, errorMessage);
 				} else {
-				    writeHead (response, 404, {'Content-Type': 'text/plain; charset=utf-8'});
+				    response.writeHead (404, {'Content-Type': 'text/plain; charset=utf-8', 'Server': 'bastard/0.5.6'});
 				    response.end (errorMessage, 'utf8');
 				}
 				return;
@@ -548,7 +544,7 @@ function Bastard (config) {
 			
 			var modificationTime = cacheRecordParam.modified;
 			if (ifModifiedSince && modificationTime && modificationTime <= ifModifiedSince) {
-				writeHead (response, 304, {});
+				response.writeHead (304, {'Server': 'bastard/0.5.6'});
 				response.end ();
 			} else {
 				var cacheTime = fingerprint ? ONE_YEAR : ONE_WEEK;
@@ -580,7 +576,7 @@ function Bastard (config) {
 		}
 		
 		function serveFromCacheRecord (cacheRecordParam) {
-			writeHead (response, 200, {'Content-Type': 'text/plain'});
+			response.writeHead (200, {'Content-Type': 'text/plain', 'Server': 'bastard/0.5.6'});
 		    response.end (errorMessage, 'utf8');
 		}
 		
