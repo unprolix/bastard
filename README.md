@@ -41,28 +41,31 @@ Running from your own code
 
         var handled = bastardObj.possiblyHandleRequest (request, response);
 
-   If the above function returns true, the request has been handled and you don't need to do anything else. Depending on how you want to structure your server, you can check bastard before or after your own URLs.
+> If the above function returns true, the request has been handled and you don't need to do anything else. Depending on how you want to structure your server, you can check bastard before or after your own URLs.
 
 
-3. To find out the current fingerprint of a file:
+To find out the current fingerprint of a file
+---------------------------------------------
 
         bastardObj.getFingerprint (filePath, basePath, function (err, fingerprint) {});
 
-	* `filePath`: full path to the file
-	* `basePath`: path to the file within the base directory (may be the same as the URL path for the file)
-	* `callback`: if present, will be called with the first argument being any error (or null) and the second argument being the fingerprint
+        * `filePath`: full path to the file
+        * `basePath`: path to the file within the base directory (may be the same as the URL path for the file)
+        * `callback`: if present, will be called with the first argument being any error (or null) and the second argument being the fingerprint
 
-   If callback is not present and the fingerprint is already known, it will be returned immediately as the result of the function call. If callback is not present and the fingerprint is not already known, the fingerprint will be internally calculated and null will be returned from the function call.
+If callback is not present and the fingerprint is already known, it will be returned immediately as the result of the function call. If callback is not present and the fingerprint is not already known, the fingerprint will be internally calculated and null will be returned from the function call.
 
-   You only need to specify one of filePath and basePath.
+You only need to specify one of filePath and basePath.
 
-   For an example of how to run bastard from your own code, examine the file start.js in the bastard package.
+For an example of how to run bastard from your own code, examine the file start.js in the bastard package.
 
-4. To preload the entire base directory:
+To preload the entire base directory
+------------------------------------
+
 
         bastardObj.preload (function (err) {});
 
-   Calling this function and waiting until the callback is invoked will ensure that all fingerprints have been precalculated before any user requests are seen. It does not load all files into memory, but does load all information about each file, and ensure that each file has been minified (where possible) and compressed (when appropriate).
+Calling this function and waiting until the callback is invoked will ensure that all fingerprints have been precalculated before any user requests are seen. It does not load all files into memory, but does load all information about each file, and ensure that each file has been minified (where possible) and compressed (when appropriate).
 
 
 Configuration
