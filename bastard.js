@@ -388,7 +388,7 @@ function Bastard (config) {
 
 		child_process.execFile ('/usr/bin/env', ['openssl', 'dgst', '-sha256', filePath], function (err, stdout, stderr) {
 			if (err) {
-				console.error ("Error from fingerprinting: " + JSON.stringify (err));
+				if (err.message.indexOf ('No such file or directory') != -1) console.error ("Error from fingerprinting: " + JSON.stringify (err));
 				cacheRecord.fingerprintError = err;
 			} else {
 				cacheRecord.fingerprint = stdout.substr (-65, 64);
@@ -434,6 +434,11 @@ function Bastard (config) {
 			if (dataComplete && fingerprintComplete) prerequisitesComplete ();
 		});
 	}
+	
+	function writeHead (response, statusCode, headers) {
+		headers['Server'] = 'bastard/0.5.5';
+		response.writeHead (statusCode, headers);
+	}
 
 	// NOTE: does this work for binary data? it should....
 	function serveDataWithEncoding (response, data, contentType, encoding, modificationTime, fingerprint, maxAgeInSeconds) {
@@ -441,12 +446,12 @@ function Bastard (config) {
 			'Content-Length': data.length,
 	        'Content-Type': contentType,
 			'Vary': 'Accept-Encoding',
-	        'Cache-Control': "max-age=" + maxAgeInSeconds			
+	        'Cache-Control': "max-age=" + maxAgeInSeconds
 		};
 		if (encoding) responseHeaders['Content-Encoding'] = encoding;
 		if (modificationTime) responseHeaders['Last-Modified'] = modificationTime;
 		if (fingerprint) responseHeaders['Etag'] = fingerprint;
-	    response.writeHead (200, responseHeaders);
+	    writeHead (response, 200, responseHeaders);
 	    response.end (data, null /*'utf8'*/);
 	}
 
@@ -469,7 +474,7 @@ function Bastard (config) {
 			
 			
 			function refillCacheRecord (gzip) {
-				console.info ("Attempting to refill cache record: " + cacheRecordParam);
+				// console.info ("Attempting to refill cache record: " + cacheRecordParam);
 				delete cacheRecordParam.reloaded;
 				if (gzip) {
 					fs.readFile (me.gzippedFileCacheDir + basePath + '.gz', null, function (err, fileData) {
@@ -493,14 +498,14 @@ function Bastard (config) {
 			var data = (gzipOK && cacheRecordParam.gzip) ? cacheRecordParam.gzip : cacheRecordParam.processed;
 			
 			if (!data) {
-				console.warn ("No data for " + basePath);
+				// console.warn ("No data for " + basePath);
 				if (cacheRecordParam.reloaded && !isRefill) { // if it is a reloaded record and we haven't tried yet
 					refillCacheRecord (gzipOK);
 					return;
 				}
 				
 				if (!cacheRecordParam.remade && !cacheRecordParam.fileError && !cacheRecordParam.fingerprintError) {
-					console.info ("Remaking...");
+					// console.info ("Remaking...");
 					remakeCacheRecord (gzipOK);
 					return;
 				}
@@ -522,7 +527,7 @@ function Bastard (config) {
 				if (errorHandler) {
 					errorHandler (response, errorCode, errorMessage);
 				} else {
-				    response.writeHead (errorCode, {'Content-Type': 'text/plain; charset=utf-8'});
+				    writeHead (response, errorCode, {'Content-Type': 'text/plain; charset=utf-8'});
 				    response.end (errorMessage, 'utf8');
 				}
 				return;
@@ -535,7 +540,7 @@ function Bastard (config) {
 				if (errorHandler) {
 					errorHandler (response, 404, errorMessage);
 				} else {
-				    response.writeHead (404, {'Content-Type': 'text/plain; charset=utf-8'});
+				    writeHead (response, 404, {'Content-Type': 'text/plain; charset=utf-8'});
 				    response.end (errorMessage, 'utf8');
 				}
 				return;
@@ -543,7 +548,7 @@ function Bastard (config) {
 			
 			var modificationTime = cacheRecordParam.modified;
 			if (ifModifiedSince && modificationTime && modificationTime <= ifModifiedSince) {
-				response.writeHead (304, {});
+				writeHead (response, 304, {});
 				response.end ();
 			} else {
 				var cacheTime = fingerprint ? ONE_YEAR : ONE_WEEK;
@@ -575,7 +580,7 @@ function Bastard (config) {
 		}
 		
 		function serveFromCacheRecord (cacheRecordParam) {
-			response.writeHead (200, {'Content-Type': 'text/plain'});
+			writeHead (response, 200, {'Content-Type': 'text/plain'});
 		    response.end (errorMessage, 'utf8');
 		}
 		
