@@ -388,7 +388,7 @@ function Bastard (config) {
 
 		child_process.execFile ('/usr/bin/env', ['openssl', 'dgst', '-sha256', filePath], function (err, stdout, stderr) {
 			if (err) {
-				if (err.message.indexOf ('No such file or directory') != -1) console.error ("Error from fingerprinting: " + JSON.stringify (err));
+				if (err.message.indexOf ('No such file or directory') == -1) console.error ("Error from fingerprinting: " + JSON.stringify (err));
 				cacheRecord.fingerprintError = err;
 			} else {
 				cacheRecord.fingerprint = stdout.substr (-65, 64);
