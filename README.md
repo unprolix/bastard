@@ -111,7 +111,7 @@ Future features:
 
 * Ability to use an API to upload processed files from base directory to a key/value store--including fingerprinted URLs. This would allow bastard to front for a CDN.
 
-
+* Minify CSS and Javascript embedded in HTML.
 
 
 License
