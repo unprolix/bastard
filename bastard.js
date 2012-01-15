@@ -65,6 +65,7 @@ function Bastard (config) {
 	console.info (config);
 	if (debug) console.info ("Debugging output enabled");
 
+	var alwaysCheckModTime = config.alwaysCheckModTime;
 	var baseDir = config.base;
 	var errorHandler = config.errorHandler;
 	var storageDir = config.workingDir || '/tmp/bastard.dat';
@@ -449,7 +450,7 @@ function Bastard (config) {
 	        'Content-Type': contentType,
 			'Vary': 'Accept-Encoding',
 	        'Cache-Control': "max-age=" + maxAgeInSeconds,
-			'Server': 'bastard/0.5.9'
+			'Server': 'bastard/0.5.10'
 		};
 		if (encoding) responseHeaders['Content-Encoding'] = encoding;
 		if (modificationTime) responseHeaders['Last-Modified'] = modificationTime;
@@ -458,9 +459,20 @@ function Bastard (config) {
 	    response.end (data, charset);
 	}
 
-	function serve (response, filePath, basePath, fingerprint, gzipOK, raw, ifModifiedSince, headOnly) {
+	function serve (response, filePath, basePath, fingerprint, gzipOK, raw, checkModTimeAgainstCache, ifModifiedSince, headOnly) {
 		// console.info ("Serving " + basePath + ' out of ' + filePath);
 		var cacheRecord = cacheData[filePath];
+
+		if (checkModTimeAgainstCache && cacheRecord) {
+			// we'll do the check and then call ourselves again.
+			fs.stat (filePath, function (err, stat) {
+				if (stat && stat.mtime != cacheRecord.modified) {
+					delete cacheData[filePath];
+				}
+				serve (response, filePath, basePath, fingerprint, gzipOK, raw, false, ifModifiedSince, headOnly);
+			});
+			return;
+		}
 
 		function serveFromCacheRecord (cacheRecordParam, isRefill) {
 			// console.info ("Serve " + basePath + " from cache record: " + formatCacheRecord (cacheRecordParam));
@@ -549,7 +561,7 @@ function Bastard (config) {
 				if (errorHandler) {
 					errorHandler (response, errorCode, errorMessage);
 				} else {
-				    response.writeHead (errorCode, {'Content-Type': 'text/plain; charset=utf-8', 'Server': 'bastard/0.5.9'});
+				    response.writeHead (errorCode, {'Content-Type': 'text/plain; charset=utf-8', 'Server': 'bastard/0.5.10'});
 				    response.end (errorMessage, 'utf8');
 				}
 				return;
@@ -562,7 +574,7 @@ function Bastard (config) {
 				if (errorHandler) {
 					errorHandler (response, 404, errorMessage);
 				} else {
-				    response.writeHead (404, {'Content-Type': 'text/plain; charset=utf-8', 'Server': 'bastard/0.5.9'});
+				    response.writeHead (404, {'Content-Type': 'text/plain; charset=utf-8', 'Server': 'bastard/0.5.10'});
 				    response.end (errorMessage, 'utf8');
 				}
 				return;
@@ -570,7 +582,7 @@ function Bastard (config) {
 			
 			var modificationTime = cacheRecordParam.modified;
 			if (ifModifiedSince && modificationTime && modificationTime <= ifModifiedSince) {
-				response.writeHead (304, {'Server': 'bastard/0.5.9'});
+				response.writeHead (304, {'Server': 'bastard/0.5.10'});
 				response.end ();
 			} else {
 				if (headOnly) {
@@ -581,7 +593,7 @@ function Bastard (config) {
 						if (errorHandler) {
 							errorHandler (response, 404, errorMessage);
 						} else {
-						    response.writeHead (404, {'Content-Type': 'text/plain; charset=utf-8', 'Server': 'bastard/0.5.9'});
+						    response.writeHead (404, {'Content-Type': 'text/plain; charset=utf-8', 'Server': 'bastard/0.5.10'});
 						    response.end (errorMessage, 'utf8');
 						}
 					} else {
@@ -618,7 +630,7 @@ function Bastard (config) {
 		}
 		
 		function serveFromCacheRecord (cacheRecordParam) {
-			response.writeHead (200, {'Content-Type': 'text/plain', 'Server': 'bastard/0.5.9'});
+			response.writeHead (200, {'Content-Type': 'text/plain', 'Server': 'bastard/0.5.10'});
 		    response.end (errorMessage, 'utf8');
 		}
 		
@@ -647,7 +659,7 @@ function Bastard (config) {
 			var gzipOK = acceptEncoding && (acceptEncoding.split(',').indexOf ('gzip') >= 0);
 			var ifModifiedSince = request.headers['if-modified-since']; // fingerprinted files are never modified, so what do we do here?
 			var headOnly = request.method == 'HEAD';
-			serve (response, filePath, basePath, null, false, true, ifModifiedSince, headOnly);
+			serve (response, filePath, basePath, null, false, true, alwaysCheckModTime, ifModifiedSince, headOnly);
 			return true;
 		}
 
@@ -663,7 +675,7 @@ function Bastard (config) {
 			var gzipOK = acceptEncoding && (acceptEncoding.split(',').indexOf ('gzip') >= 0);
 			var ifModifiedSince = request.headers['if-modified-since']; // fingerprinted files are never modified, so what do we do here?
 			var headOnly = request.method == 'HEAD';
-			serve (response, filePath, basePath, fingerprint, gzipOK, false, ifModifiedSince, headOnly);
+			serve (response, filePath, basePath, fingerprint, gzipOK, false, alwaysCheckModTime, ifModifiedSince, headOnly);
 			return true;
 		}
 		if (request.url.indexOf (urlPrefix) == 0) {
@@ -675,7 +687,7 @@ function Bastard (config) {
 			var gzipOK = acceptEncoding && (acceptEncoding.split(',').indexOf ('gzip') >= 0);
 			var ifModifiedSince = request.headers['if-modified-since']; // fingerprinted files are never modified, so what do we do here?
 			var headOnly = request.method == 'HEAD';
-			serve (response, filePath, basePath, null, gzipOK, false, ifModifiedSince, headOnly);
+			serve (response, filePath, basePath, null, gzipOK, false, alwaysCheckModTime, ifModifiedSince, headOnly);
 			return true;
 		}
 		// console.info ("NO MATCH: " + request.url);

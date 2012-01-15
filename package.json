@@ -1,6 +1,6 @@
 {
 	"name": "bastard",
-	"version": "0.5.9",
+	"version": "0.5.10",
 	"description": "A webserver for static files that does things right.",
 	"keywords": "webserver, fingerprint, static",
 	"homepage": "http://jeremy.org/bastard/",
@@ -31,6 +31,7 @@
 		"port": 80,
 		"host": null,
 		"base": null,
+		"alwaysCheckModTime": true,
 		"preload": false,
 		"debug": false,
 		"directories": false,
