@@ -5,10 +5,10 @@ var child_process = require ('child_process');
 var fs = require ('fs');
 var uglify = require ("uglify-js");
 var csso = require ("csso");
-/*var gzbz2 = require ("gzbz2");*/
 var gzip = require ("gzip");
 var mime = require ('mime');
 var html_minifier = require ('html-minifier')
+
 /*
 
 	
@@ -18,21 +18,6 @@ TODO:
 	allow preloading of all files into memory
 
 */
-
-function minifyHTML (data) {
-	return html_minifier.minify (data, {
-		removeComments: true,
-		removeCommentsFromCDATA: true,
-		removeCDATASectionsFromCDATA: true,
-		collapseWhitespace: false, /* we really want the "collapse into a single space" version of this */
-		collapseBooleanAttributes: true,
-		removeAttributeQuotes: true,
-		removeRedundantAttributes: true,
-		removeEmptyAttributes: true,
-		removeOptionalTags: true,
-		removeEmptyElements: false		
-	});
-}
 
 // These are reusable
 var JSP = uglify.parser;
@@ -75,6 +60,94 @@ function Bastard (config) {
 	if (baseDir.charAt (baseDir.length-1) != '/') baseDir += '/';
 	
 	me._emitter = new events.EventEmitter ();
+	
+	me.minifyHTML = function (data, filePath, basePath) {
+		var provisional = false; // set to true if we are missing a fingerprint
+		
+		// identify embedded CSS and replace it with minimized CSS
+		// identify embedded JS and replace it with minimized JS
+		// identify referenced CSS and if the fingerprint is available, replace with a reference to the fingerprinted version
+		// identify referenced JS and if the fingerprint is available, replace with a reference to the fingerprinted version
+		// identify referenced images and if the fingerprint is available, replace with a reference to the fingerprinted version
+		
+		var dirPath = basePath.substring (0, basePath.lastIndexOf('/'));
+		
+		var Scanner = require("htmlscanner").Scanner;
+		var scanner = new Scanner (data);
+		var processed = '';
+		do {
+			var token = scanner.next ();
+			var tokenType = token[0];
+			switch (tokenType) {
+				case 1:
+					var tagName = token[1];
+					var attributes = {};
+					for (var i = 2; i < token.length; i+= 2) {
+						attributes[token[i]] = token[i+1];
+					}
+	
+					if (tagName.toLowerCase () == 'script') {
+						// special processing for script tags
+						if ('src' in attributes) {
+							var src = attributes.src;
+							var scriptPath;
+							if (src.charAt(0) == '/') {
+								scriptPath = baseDir + src.substring(1);
+								if (debug) {
+									console.info ("Script source begins with slash so it's from base files dir of the bastard, and path is: " + scriptPath);
+								}
+							} else {
+								scriptPath = baseDir + dirPath + "/" + src;
+								src = '/' + dirPath + "/" + src;
+								if (debug) {
+									console.info ("Script source does not begin with slash so it's relative to the requested url, and path is: " + scriptPath);								
+								}
+							}
+							
+							var fingerprint = me.getFingerprint (scriptPath, null);
+							if (!fingerprint) {
+								console.info ("No fingerprint found for " + scriptPath);
+								provisional = true;
+							} else {
+								console.info ("Fingerprint found: " + fingerprint);
+								attributes.src = fingerprintURLPrefix + fingerprint + src;
+							}
+						}
+					}
+					
+					var tag = "<" + tagName;
+					for (var attr in attributes) tag += " " + attr + '="' + attributes[attr] + '"';
+					tag += ">";
+					processed += tag;
+					break;
+				case 2:
+					processed += "</" + token[1] + ">";
+					break;
+				case 4:
+					processed += token[1];
+					break;
+			}
+		} while (token[0]);
+	
+		console.info(processed);
+	
+		var minified = html_minifier.minify (processed, {
+			removeComments: true,
+			removeCommentsFromCDATA: true,
+			removeCDATASectionsFromCDATA: true,
+			collapseWhitespace: false, /* we really want the "collapse into a single space" version of this */
+			collapseBooleanAttributes: true,
+			removeAttributeQuotes: true,
+			removeRedundantAttributes: true,
+			removeEmptyAttributes: true,
+			removeOptionalTags: true,
+			removeEmptyElements: false		
+		});
+		
+		if (provisional) return {value: minified, provisional: true};
+		else return minified;
+	};
+	
 	setupStorageDir ();
 	
 	// console.info ("*** " + config.workingDir);
@@ -87,7 +160,7 @@ function Bastard (config) {
 	var preprocessors = {
 		'.js': minifyJavascript,
 		'.css': csso.justDoIt,
-		'.html': minifyHTML
+		'.html': me.minifyHTML
 	};
 
 	var ONE_WEEK = 60 * 60 * 24 * 7;
@@ -101,6 +174,7 @@ function Bastard (config) {
 		for (var i = 0; i < keys.length; i++) {
 			var key = keys[i];
 			var value = cacheRecord[key];
+			if (key == 'gzip') value = "BINARY DATA";
 			var valueType = typeof value;
 			if (valueType == 'number') result.push (key + ': ' + value);
 			if (value == null) result.push (key + ': null');
@@ -220,10 +294,10 @@ function Bastard (config) {
 	
 		function loadOldCache (oldCache) {
 			//we have filepath -> rawSize, fingerprint, modified
-			// console.info ("Loading old cache");
+			if (debug) console.info ("Loading old cache");
 			var remaining = 0;
 			for (var filePath in oldCache) remaining++;
-			// console.info ("Will check record count: " + remaining);
+			if (debug) console.info ("Will check record count: " + remaining);
 			function checkCacheRecord (path, record) {
 				// compare size and modtime with the live ones from the file.
 				// if those are the same, we assume the fingerprint and cached processed/compressed files are still good.
@@ -240,13 +314,17 @@ function Bastard (config) {
 						}
 						if (record.rawSize == statObj.size) {
 							var cacheWhen = Date.parse (record.modified);
-							//console.info ("Stored mtime: " + cacheWhen);
-							//console.info ("  Live mtime: " + statObj.mtime);
-							if (cacheWhen == statObj.mtime) {
+							if (debug) console.info ("Stored mtime: " + cacheWhen);
+							if (debug) console.info ("  Live mtime: " + statObj.mtime.getTime ());
+							if (cacheWhen == statObj.mtime.getTime ()) {
 								if (debug) console.info ("**** ELIGIBLE FOR REUSE");
 								record.reloaded = true;
 								cacheData[path] = record; // keep the info but load the data on demand only.
+							} else {
+								if (debug) console.info ("**** NOT ELIGIBLE FOR REUSE (different mod times)");
 							}
+						} else {
+							if (debug) console.info ("**** NOT ELIGIBLE FOR REUSE (different sizes)");
 						}
 					}
 					remaining--;
@@ -303,9 +381,11 @@ function Bastard (config) {
 
 
 	function prepareCacheForFile (filePath, basePath, callback) {
+		console.info ("In prepareCacheForFile(" + filePath + ", " + basePath + ")");
 		var cacheRecord = {};
 
 		function writeCacheData (filePath, data) {
+			// write data as cached data for the given filePath
 			// if there is any problem here, just bail with an informational message. errors are not critical.
 			
 			var parts = filePath.split ('/');
@@ -364,6 +444,12 @@ function Bastard (config) {
 			// TODO: do we want to NOT store the data if it was an error?
 			cacheData[filePath] = cacheRecord; // set it all at once
 			if (callback instanceof Function) callback (cacheRecord);
+			if (cacheRecord.processedProvisional) {
+				console.info ("Erasing provisional data.");
+				delete cacheRecord.remade;
+				delete cacheRecord.processed;
+				delete cacheRecord.gzip;
+			}
 		}
 
 		var dataComplete = false; // we need to know this explicitly, in case there was an error
@@ -387,7 +473,7 @@ function Bastard (config) {
 				cacheRecord.fingerprintError = err;
 			} else {
 				cacheRecord.fingerprint = stdout.substr (-65, 64);
-				//console.info ("Fingerprint: " + cacheRecord.fingerprint);
+				if (debug) console.info ("Fingerprint for " + filePath + ": " + cacheRecord.fingerprint);
 			}
 			fingerprintComplete = true;
 			if (dataComplete && statComplete) prerequisitesComplete ();
@@ -409,7 +495,19 @@ function Bastard (config) {
 				if (!basePath) basePath = filePath.substring (baseDir.length);
 				
 				// console.info ("Preprocessor: " + preprocessor);
-				cacheRecord.processed = (preprocessor) ? preprocessor (data, filePath) : data;
+				if (preprocessor) {
+					var processed = preprocessor (data, filePath, basePath);
+					if (processed.provisional) {
+						console.info ("Preprocessed data is provisional.");
+						cacheRecord.processed = processed.value;
+						cacheRecord.processedProvisional = true;
+					} else {
+						cacheRecord.processed = processed;
+					}
+				} else {
+					// no preprocessor for this type.
+					cacheRecord.processed = data;
+				}
 				writeCacheData (me.processedFileCacheDir + basePath, cacheRecord.processed);
 				
 				if (cacheRecord.contentType && cacheRecord.contentType.indexOf ('image/') != 0) {
@@ -460,7 +558,7 @@ function Bastard (config) {
 	}
 
 	function serve (response, filePath, basePath, fingerprint, gzipOK, raw, checkModTimeAgainstCache, ifModifiedSince, headOnly) {
-		// console.info ("Serving " + basePath + ' out of ' + filePath);
+		console.info ("Serving " + basePath + ' out of ' + filePath);
 		var cacheRecord = cacheData[filePath];
 
 		if (checkModTimeAgainstCache && cacheRecord) {
@@ -475,12 +573,13 @@ function Bastard (config) {
 		}
 
 		function serveFromCacheRecord (cacheRecordParam, isRefill) {
-			// console.info ("Serve " + basePath + " from cache record: " + formatCacheRecord (cacheRecordParam));
+			if (debug) console.info ("Serve " + basePath + " from cache record: " + formatCacheRecord (cacheRecordParam));
 			if (gzipOK && cacheRecordParam.contentType && cacheRecordParam.contentType.indexOf ('image/') == 0) {
 				gzipOK = false; // do not gzip image files.
 			}
 			
 			function remakeCacheRecord () {
+				if (debug) console.info ("Attempting to remake cache record: " + cacheRecordParam);
 				prepareCacheForFile (filePath, basePath, function (newCacheRecord) {
 					newCacheRecord.remade = true;
 					serveFromCacheRecord (newCacheRecord);					
@@ -527,7 +626,7 @@ function Bastard (config) {
 			else data = cacheRecordParam.processed;
 			
 			if (data == null && !headOnly) {
-				// console.warn ("No data for " + basePath);
+				if (debug) console.warn ("No data for " + basePath);
 				if (cacheRecordParam.reloaded && !isRefill) { // if it is a reloaded record and we haven't tried yet
 					refillCacheRecord ();
 					return;
@@ -552,8 +651,6 @@ function Bastard (config) {
 					errorCode = 500;
 					errorMessage = "Internal error.";
 					console.error ("Problem serving " + filePath);
-					console.info (cacheRecordParam.fileError);
-					console.info (cacheRecordParam.fingerprintError);
 					if (cacheRecordParam.fileError) console.error ("File error: " + JSON.stringify (cacheRecordParam.fileError));
 					if (cacheRecordParam.fingerprintError) console.error ("Fingerprint error: " + JSON.stringify (cacheRecordParam.fingerprintError));
 				}
@@ -614,16 +711,19 @@ function Bastard (config) {
 	}
 	
 	me.getFingerprint = function (filePath, basePath, callback) {
-		var cacheRecord = cacheData[filePath];
 		var callbackOK = callback instanceof Function;
 
 		// if filePath is null but basePath is not, figure out filePath
 		if (!filePath && basePath) filePath = baseDir + basePath;
+		if (debug) console.info ("Fingerprinting: " + filePath + " aka " + basePath);
+		var cacheRecord = cacheData[filePath];
 
 		if (!callbackOK) {
 			if (cacheRecord) {
+				if (debug) console.info ("Returning fingerprint from cache record: " + cacheRecord.fingerprint);
 				return cacheRecord.fingerprint;
 			} else {
+				if (debug) console.info ("No cache record for fingerprinting " + filePath + ", so preparing cache record.");
 				prepareCacheForFile (filePath, basePath);
 				return null;
 			}			
