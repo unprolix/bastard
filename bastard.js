@@ -50,18 +50,39 @@ function Bastard (config) {
 	console.info (config);
 	if (debug) console.info ("Debugging output enabled");
 
+	var defaultFileName = config.defaultFileName || 'index.html';
 	var alwaysCheckModTime = config.alwaysCheckModTime;
 	var baseDir = config.base;
 	var errorHandler = config.errorHandler;
 	var storageDir = config.workingDir || '/tmp/bastard.dat';
 	var urlPrefix = config.urlPrefix;
 	var rawURLPrefix = config.rawURLPrefix;
+	var virtualHostMode = config.virtualHostMode || false;
 	var fingerprintURLPrefix = config.fingerprintURLPrefix;
 	if (baseDir.charAt (baseDir.length-1) != '/') baseDir += '/';
 	
 	me._emitter = new events.EventEmitter ();
 	
+	var virtualHostDirs;
+	if (virtualHostMode) {
+		virtualHostDirs = {};
+		fs.readdir (baseDir, function (err, list) {
+			if (err) throw "Problem reading virtual host directories from " + baseDir;
+			for (var i = 0; i < list.length; i++) {
+				var item = list[i];
+				virtualHostDirs[item.toLowerCase ()] = baseDir + item + "/";
+			}
+		});	
+	}
+	
 	me.minifyHTML = function (data, filePath, basePath) {
+		console.info ("******** Minimizing HTML");
+		console.info ("file path: " + filePath);
+		console.info ("base path: " + basePath);
+		var baseDir = filePath.substring (0, filePath.length - basePath.length);
+		console.info ("base dir: " + baseDir);
+		console.info ("********");
+
 		var provisional = false; // set to true if we are missing a fingerprint
 		
 		// identify embedded CSS and replace it with minimized CSS
@@ -531,7 +552,10 @@ function Bastard (config) {
 					cacheRecord.raw = data; // only keep it if we might be asked for it later
 				}
 				
-				if (!basePath) basePath = filePath.substring (baseDir.length);
+				if (!basePath) {
+					basePath = filePath.substring (baseDir.length);
+					if (virtualHostMode) basePath = basePath.substring (basePath.indexOf ('/') + 1);
+				}
 				
 				// console.info ("Preprocessor: " + preprocessor);
 				if (preprocessor) {
@@ -587,7 +611,7 @@ function Bastard (config) {
 	        'Content-Type': contentType,
 			'Vary': 'Accept-Encoding',
 	        'Cache-Control': "max-age=" + maxAgeInSeconds,
-			'Server': 'bastard/0.5.11'
+			'Server': 'bastard/0.6.0
 		};
 		if (encoding) responseHeaders['Content-Encoding'] = encoding;
 		if (modificationTime) responseHeaders['Last-Modified'] = modificationTime;
@@ -697,7 +721,7 @@ function Bastard (config) {
 				if (errorHandler) {
 					errorHandler (response, errorCode, errorMessage);
 				} else {
-				    response.writeHead (errorCode, {'Content-Type': 'text/plain; charset=utf-8', 'Server': 'bastard/0.5.11'});
+				    response.writeHead (errorCode, {'Content-Type': 'text/plain; charset=utf-8', 'Server': 'bastard/0.6.0});
 				    response.end (errorMessage, 'utf8');
 				}
 				return;
@@ -710,7 +734,7 @@ function Bastard (config) {
 				if (errorHandler) {
 					errorHandler (response, 404, errorMessage);
 				} else {
-				    response.writeHead (404, {'Content-Type': 'text/plain; charset=utf-8', 'Server': 'bastard/0.5.11'});
+				    response.writeHead (404, {'Content-Type': 'text/plain; charset=utf-8', 'Server': 'bastard/0.6.0});
 				    response.end (errorMessage, 'utf8');
 				}
 				return;
@@ -718,7 +742,7 @@ function Bastard (config) {
 			
 			var modificationTime = cacheRecordParam.modified;
 			if (ifModifiedSince && modificationTime && modificationTime <= ifModifiedSince) {
-				response.writeHead (304, {'Server': 'bastard/0.5.11'});
+				response.writeHead (304, {'Server': 'bastard/0.6.0});
 				response.end ();
 			} else {
 				if (headOnly) {
@@ -729,7 +753,7 @@ function Bastard (config) {
 						if (errorHandler) {
 							errorHandler (response, 404, errorMessage);
 						} else {
-						    response.writeHead (404, {'Content-Type': 'text/plain; charset=utf-8', 'Server': 'bastard/0.5.11'});
+						    response.writeHead (404, {'Content-Type': 'text/plain; charset=utf-8', 'Server': 'bastard/0.6.0});
 						    response.end (errorMessage, 'utf8');
 						}
 					} else {
@@ -753,7 +777,7 @@ function Bastard (config) {
 		var callbackOK = callback instanceof Function;
 
 		// if filePath is null but basePath is not, figure out filePath
-		if (!filePath && basePath) filePath = baseDir + basePath;
+		if (!filePath && basePath) filePath = baseDir + basePath; // TODO: does not work for virtualhosts
 		if (debug) console.info ("Fingerprinting: " + filePath + " aka " + basePath);
 		var cacheRecord = cacheData[filePath];
 
@@ -769,7 +793,7 @@ function Bastard (config) {
 		}
 		
 		function serveFromCacheRecord (cacheRecordParam) {
-			response.writeHead (200, {'Content-Type': 'text/plain', 'Server': 'bastard/0.5.11'});
+			response.writeHead (200, {'Content-Type': 'text/plain', 'Server': 'bastard/0.6.0});
 		    response.end (errorMessage, 'utf8');
 		}
 		
@@ -782,17 +806,30 @@ function Bastard (config) {
 		}
 	}
 	
+	function matchingVirtualHostDir (host) {
+		host = host.toLowerCase ();
+		if (host in virtualHostDirs) return virtualHostDirs[host];
+		host = host.substring (host.indexOf ('.') + 1);
+		if (host in virtualHostDirs) return virtualHostDirs[host];
+		return baseDir + config.defaultHost + "/";
+	}
+	
+	
 	var fingerprintPrefixLen = fingerprintURLPrefix.length;
 	var urlPrefixLen = urlPrefix.length;
 	var rawPrefixLen = rawURLPrefix.length;
+	var directoryCheck = {};
 	me.possiblyHandleRequest = function (request, response) {
+		if (virtualHostMode) request.baseDir = matchingVirtualHostDir (request.headers.host);
+		else request.baseDir = baseDir;
+
 		// console.info ("PFC maybe handling: " + request.url);
 		// console.info ('fup: ' + fingerprintURLPrefix);
 		// console.info ('up: ' + urlPrefix);
 		if (rawURLPrefix && request.url.indexOf (rawURLPrefix) == 0) {
 			var basePath = request.url.substring (rawPrefixLen);
 			console.info ("    raw basePath: " + basePath);
-			var filePath = baseDir + basePath;
+			var filePath = request.baseDir + basePath;
 			console.info ("    raw filePath: " + filePath);
 			var acceptEncoding = request.headers['accept-encoding'];
 			var gzipOK = acceptEncoding && (acceptEncoding.split(',').indexOf ('gzip') >= 0);
@@ -807,7 +844,7 @@ function Bastard (config) {
 			var slashPos = base.indexOf ('/');
 			var basePath = base.substring (slashPos + 1);
 			var fingerprint = base.substring (0, slashPos)
-			var filePath = baseDir + basePath;
+			var filePath = request.baseDir + basePath;
 			// console.info ("    fingerprint filePath: " + filePath);
 			// console.info ("        fingerprint: " + fingerprint);
 			var acceptEncoding = request.headers['accept-encoding'];
@@ -818,21 +855,52 @@ function Bastard (config) {
 			return true;
 		}
 		if (request.url.indexOf (urlPrefix) == 0) {
-			var basePath = request.url.substring (urlPrefixLen);
-			
-			var filePath = baseDir + basePath;
-			//console.info ("    filePath: " + filePath);
 			var acceptEncoding = request.headers['accept-encoding'];
 			var gzipOK = acceptEncoding && (acceptEncoding.split(',').indexOf ('gzip') >= 0);
 			var ifModifiedSince = request.headers['if-modified-since']; // fingerprinted files are never modified, so what do we do here?
 			var headOnly = request.method == 'HEAD';
-			serve (response, filePath, basePath, null, gzipOK, false, alwaysCheckModTime, ifModifiedSince, headOnly);
+
+			var basePath = request.url.substring (urlPrefixLen);
+			
+			if (basePath.length == 0 || basePath.charAt (basePath.length - 1) == '/') basePath += defaultFileName;
+
+			var filePath = request.baseDir + basePath;
+			console.info ("    filePath: " + filePath);
+			console.info ("    basePath: " + basePath);
+			
+			if (filePath in directoryCheck) {
+				if (directoryCheck[filePath]) {
+					console.info ("It is a directory (i already checked). Should do the special thing.");
+					filePath += "/" + defaultFileName;
+					basePath += "/" + defaultFileName;
+				} else {
+					console.info ("Not a directory. No special thing.");
+				}
+				serve (response, filePath, basePath, null, gzipOK, false, alwaysCheckModTime, ifModifiedSince, headOnly);
+			} else {
+				fs.stat (filePath, function (err, statObj) {
+					if (!err) {
+						var isDir = statObj.isDirectory ();
+						directoryCheck[filePath] = isDir;
+						if (isDir) {
+							console.info ("It is a directory. Should do the special thing.");
+							filePath += "/" + defaultFileName;
+							basePath += "/" + defaultFileName;
+						} else {
+							console.info ("Not a directory. No special thing.");
+						}
+					}
+					serve (response, filePath, basePath, null, gzipOK, false, alwaysCheckModTime, ifModifiedSince, headOnly);
+				});
+			}
+			
 			return true;
 		}
 		// console.info ("NO MATCH: " + request.url);
 		return false; // do not want
 	}
 	
+	// TODO: fix this for virtual host mode
 	var prefixLengthToRemove = baseDir.length;
 	me.urlForFile = function (filePath) {
 		var basePath = filePath.substring (prefixLengthToRemove);

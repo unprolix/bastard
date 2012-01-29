@@ -5,7 +5,7 @@ The purpose of bastard is to serve static content over the web quickly, accordin
 
 Additionally, bastard will automatically generate cryptographic fingerprints for all files it serves, and return this fingerprint as the value of the Etag header in its responses. Files are available at fingerprinted URLs so that they can be cached indefinitely by client browsers. You can programmatically ask it for the current fingerprinted URL for a file so that you can use that URL in HTML you generate external to the server. When bastard serves fingerprinted files, they are served with very long cache times because those URLs should always serve the same content.
 
-CSS, Javascript, and HTML are minified. Files of other types are not modified, though they will be compressed for transmission if they're not image files. (Image files are never compressed by this software.) Note that in some rare cases, HTML minification can cause problems. In bastard, the HTML minification is not extremely aggressive and so will probably be fine. You can turn it off with a future config option if you are worried or actually find a problem in practice.
+CSS, Javascript, and HTML are minified, including CSS and Javascript inside HTML files. Files of other types are not modified, though they will be compressed for transmission if they're not image files. (Image files are never compressed by this software.) Note that in some rare cases, HTML minification can cause problems. In bastard, the HTML minification is not extremely aggressive and so will probably be fine. You can turn it off with a future config option if you are worried or actually find a problem in practice.
 
 
 Installing
@@ -78,6 +78,8 @@ Note that there are some not-too-complicated subtleties in URL matching.  The ra
 
 `base`    Directory where files to be served reside. (Default: empty)
 
+`defaultFileName`	The name of the default file when a path ending in '/' is specified. (Default: /index.html/)
+
 `rawURLPrefix`  The prefix for URLs from which raw files should be served. These will be just as they are on disk: not minified, not compressed. (Default: /raw/)
 
 `fingerprintURLPrefix`  The prefix for URLs from which fingerprinted files should be served. The fingerprint will appear in the URLs after this prefix followed by the relative pathname to the file in the base directory. (Default: /f/)
@@ -90,6 +92,9 @@ Note that there are some not-too-complicated subtleties in URL matching.  The ra
 
 `directories` If true, will generate directory listings. (Not yet implemented.) (Default: false)
 
+`virtualHostMode` If true, directories in `base` represent hostnames. Files will be served from the matching directory based on the HTTP 1.1 hostname received. If there is no match, the first compoent (e.g. "www." from "www.example.com") is removed and the match is tried again. If there is still no match, the default directory is used. (See below)
+
+`defaultHost` The name of the directory to be used when the HTTP 1.1 hostname matches no other directory. Used only when `virtualHostMode` is true.
 
 Standalone Server
 -----------------
@@ -109,8 +114,6 @@ Limitations
 
 If the mime type for a file begins with "image/", it will not be gzipped.  All other files will be gzipped if the client indicates that it can understand gzipped data. This may not be the best choice for all file types.
 
-Does not do virtual hosting. If you want virtual hosting, create a new Bastard object for each host.
-
 
 Project Status
 ==============
@@ -124,8 +127,6 @@ Future features:
 * Ability to use an API, instead of the filesystem, as the source of files to be served. This would allow serving data from (e.g.) key/value stores.
 
 * Ability to use an API to upload processed files from base directory to a key/value store--including fingerprinted URLs. This would allow bastard to front for a CDN.
-
-* Minify CSS and Javascript embedded in HTML.
 
 
 License

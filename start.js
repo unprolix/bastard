@@ -23,6 +23,8 @@ function startBastard () {
 	var config = {
 		base: base,
 		debug: process.env.npm_package_config_debug == 'true',
+		virtualHostMode: process.env.npm_package_config_virtualHostMode == 'true',
+		defaultHost: process.env.npm_package_config_defaultHost || 'default',
 		alwaysCheckModTime: process.env.npm_package_config_alwaysCheckModTime == 'true',
 		directories: process.env.npm_package_config_directories == 'true',
 		rawURLPrefix: process.env.npm_package_config_rawURLPrefix,
@@ -57,7 +59,7 @@ function startBastard () {
 		if (!handled) {
 			console.warn ("Request not handled by bastard: " + request.method + " " + request.url);
 			response.writeHead (404, {
-				'Server': 'bastard/0.5.11',
+				'Server': 'bastard/0.6.0,
 				'Content-Type': 'text/plain; charset=utf-8'
 			});
             response.end ("Not found.");
