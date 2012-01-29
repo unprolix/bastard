@@ -86,32 +86,59 @@ function Bastard (config) {
 						attributes[token[i]] = token[i+1];
 					}
 	
-					if (tagName.toLowerCase () == 'script') {
+					var tagNameLC = tagName.toLowerCase ();
+					if (tagNameLC == 'script' && 'src' in attributes) {
 						// special processing for script tags
-						if ('src' in attributes) {
-							var src = attributes.src;
-							var scriptPath;
-							if (src.charAt(0) == '/') {
-								scriptPath = baseDir + src.substring(1);
-								if (debug) {
-									console.info ("Script source begins with slash so it's from base files dir of the bastard, and path is: " + scriptPath);
-								}
-							} else {
-								scriptPath = baseDir + dirPath + "/" + src;
-								src = '/' + dirPath + "/" + src;
-								if (debug) {
-									console.info ("Script source does not begin with slash so it's relative to the requested url, and path is: " + scriptPath);								
-								}
+						var src = attributes.src;
+						var scriptPath;
+						if (src.charAt(0) == '/') {
+							scriptPath = baseDir + src.substring(1);
+							if (debug) {
+								console.info ("Script source begins with slash so it's from base files dir of the bastard, and path is: " + scriptPath);
 							}
-							
-							var fingerprint = me.getFingerprint (scriptPath, null);
-							if (!fingerprint) {
-								console.info ("No fingerprint found for " + scriptPath);
-								provisional = true;
-							} else {
-								console.info ("Fingerprint found: " + fingerprint);
-								attributes.src = fingerprintURLPrefix + fingerprint + src;
+						} else {
+							scriptPath = baseDir + dirPath + "/" + src;
+							if (dirPath.length > 0) src = '/' + dirPath + "/" + src;
+							else src = '/' + src;
+							if (debug) {
+								console.info ("Script source does not begin with slash so it's relative to the requested url, and path is: " + scriptPath);								
 							}
+						}
+						
+						var fingerprint = me.getFingerprint (scriptPath, null);
+						if (!fingerprint) {
+							console.info ("No fingerprint found for " + scriptPath);
+							provisional = true;
+						} else {
+							console.info ("Fingerprint found: " + fingerprint);
+							attributes.src = fingerprintURLPrefix + fingerprint + src;
+						}
+					} else if (tagNameLC == 'link' && attributes.type == 'text/css' && 'href' in attributes) {
+						console.info ("*** PROCESSING CSS ***");
+						// special processing for css files
+						var src = attributes.href;
+						var scriptPath;
+						if (src.charAt(0) == '/') {
+							scriptPath = baseDir + src.substring(1);
+							if (debug) {
+								console.info ("Script source begins with slash so it's from base files dir of the bastard, and path is: " + scriptPath);
+							}
+						} else {
+							scriptPath = baseDir + dirPath + "/" + src;
+							if (dirPath.length > 0) src = '/' + dirPath + "/" + src;
+							else src = '/' + src;
+							if (debug) {
+								console.info ("Script source does not begin with slash so it's relative to the requested url, and path is: " + scriptPath);								
+							}
+						}
+						
+						var fingerprint = me.getFingerprint (scriptPath, null);
+						if (!fingerprint) {
+							console.info ("No fingerprint found for " + scriptPath);
+							provisional = true;
+						} else {
+							console.info ("Fingerprint found: " + fingerprint);
+							attributes.href = fingerprintURLPrefix + fingerprint + src;
 						}
 					}
 					
