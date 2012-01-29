@@ -75,6 +75,8 @@ function Bastard (config) {
 		var Scanner = require("htmlscanner").Scanner;
 		var scanner = new Scanner (data);
 		var processed = '';
+		var insideScriptTag = false;
+		var insideCSSTag = false;
 		do {
 			var token = scanner.next ();
 			var tokenType = token[0];
@@ -87,31 +89,29 @@ function Bastard (config) {
 					}
 	
 					var tagNameLC = tagName.toLowerCase ();
-					if (tagNameLC == 'script' && 'src' in attributes) {
-						// special processing for script tags
-						var src = attributes.src;
-						var scriptPath;
-						if (src.charAt(0) == '/') {
-							scriptPath = baseDir + src.substring(1);
-							if (debug) {
-								console.info ("Script source begins with slash so it's from base files dir of the bastard, and path is: " + scriptPath);
+					if (tagNameLC == 'script') {
+						insideScriptTag = true;
+						if ('src' in attributes) {
+							// special processing for script tags
+							var src = attributes.src;
+							var scriptPath;
+							if (src.charAt(0) == '/') {
+								scriptPath = baseDir + src.substring(1);
+								if (debug) console.info ("Script source begins with slash so it's from base files dir of the bastard, and path is: " + scriptPath);
+							} else {
+								scriptPath = baseDir + dirPath + "/" + src;
+								if (dirPath.length > 0) src = '/' + dirPath + "/" + src;
+								else src = '/' + src;
+								if (debug) console.info ("Script source does not begin with slash so it's relative to the requested url, and path is: " + scriptPath);								
 							}
-						} else {
-							scriptPath = baseDir + dirPath + "/" + src;
-							if (dirPath.length > 0) src = '/' + dirPath + "/" + src;
-							else src = '/' + src;
-							if (debug) {
-								console.info ("Script source does not begin with slash so it's relative to the requested url, and path is: " + scriptPath);								
+							
+							var fingerprint = me.getFingerprint (scriptPath, null);
+							if (!fingerprint) {
+								if (debug) console.info ("No fingerprint found for " + scriptPath);
+								provisional = true;
+							} else {
+								attributes.src = fingerprintURLPrefix + fingerprint + src;
 							}
-						}
-						
-						var fingerprint = me.getFingerprint (scriptPath, null);
-						if (!fingerprint) {
-							console.info ("No fingerprint found for " + scriptPath);
-							provisional = true;
-						} else {
-							console.info ("Fingerprint found: " + fingerprint);
-							attributes.src = fingerprintURLPrefix + fingerprint + src;
 						}
 					} else if (tagNameLC == 'link' && attributes.type == 'text/css' && 'href' in attributes) {
 						console.info ("*** PROCESSING CSS ***");
@@ -120,26 +120,23 @@ function Bastard (config) {
 						var scriptPath;
 						if (src.charAt(0) == '/') {
 							scriptPath = baseDir + src.substring(1);
-							if (debug) {
-								console.info ("Script source begins with slash so it's from base files dir of the bastard, and path is: " + scriptPath);
-							}
+							if (debug) console.info ("Script source begins with slash so it's from base files dir of the bastard, and path is: " + scriptPath);
 						} else {
 							scriptPath = baseDir + dirPath + "/" + src;
 							if (dirPath.length > 0) src = '/' + dirPath + "/" + src;
 							else src = '/' + src;
-							if (debug) {
-								console.info ("Script source does not begin with slash so it's relative to the requested url, and path is: " + scriptPath);								
-							}
+							if (debug) console.info ("Script source does not begin with slash so it's relative to the requested url, and path is: " + scriptPath);								
 						}
 						
 						var fingerprint = me.getFingerprint (scriptPath, null);
 						if (!fingerprint) {
-							console.info ("No fingerprint found for " + scriptPath);
+							if (debug) console.info ("No fingerprint found for " + scriptPath);
 							provisional = true;
 						} else {
-							console.info ("Fingerprint found: " + fingerprint);
 							attributes.href = fingerprintURLPrefix + fingerprint + src;
 						}
+					} else if (tagNameLC == 'style' && attributes.type == 'text/css') {
+						insideCSSTag = true;
 					}
 					
 					var tag = "<" + tagName;
@@ -148,10 +145,25 @@ function Bastard (config) {
 					processed += tag;
 					break;
 				case 2:
-					processed += "</" + token[1] + ">";
+					var tagName = token[1];
+					var tagNameLC = tagName.toLowerCase ();
+					if (tagNameLC == 'script') {
+						insideScriptTag = false;
+					} else if (tagNameLC == 'style') {
+						insideCSSTag = false;
+					}
+					processed += "</" + tagName + ">";
 					break;
 				case 4:
-					processed += token[1];
+					if (insideScriptTag) {
+						if (debug) console.info ("Minifying inline javascript: " + insideScriptTag);
+						processed += minifyJavascript (token[1], null);
+					} else if (insideCSSTag) {
+						if (debug) console.info ("Minifying inline CSS: " + insideCSSTag);
+						processed += csso.justDoIt (token[1]);
+					} else {
+						processed += token[1];
+					}
 					break;
 			}
 		} while (token[0]);
