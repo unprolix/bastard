@@ -6,6 +6,10 @@ var fs = require ('fs');
 var bastard = require ('./bastard.js');
 
 function startBastard () {
+	var pidFile = process.env.npm_package_config_pidFile || '/var/run/bastard.pid';
+	fs.writeFile (pidFile, process.pid, 'utf8');
+
+
 	var base = process.env.npm_package_config_base;
 	try {
 		var statObj = fs.statSync (base);
@@ -59,7 +63,7 @@ function startBastard () {
 		if (!handled) {
 			console.warn ("Request not handled by bastard: " + request.method + " " + request.url);
 			response.writeHead (404, {
-				'Server': 'bastard/0.6.1',
+				'Server': 'bastard/0.6.2',
 				'Content-Type': 'text/plain; charset=utf-8'
 			});
             response.end ("Not found.");

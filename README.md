@@ -92,6 +92,8 @@ Note that there are some not-too-complicated subtleties in URL matching.  The ra
 
 `directories` If true, will generate directory listings. (Not yet implemented.) (Default: false)
 
+`pidFile` The file into which to write the PID of the server. (Default: /var/run/bastard.pid)
+
 `virtualHostMode` If true, directories in `base` represent hostnames. Files will be served from the matching directory based on the HTTP 1.1 hostname received. If there is no match, the first compoent (e.g. "www." from "www.example.com") is removed and the match is tried again. If there is still no match, the default directory is used. (See below)
 
 `defaultHost` The name of the directory to be used when the HTTP 1.1 hostname matches no other directory. Used only when `virtualHostMode` is true.
