@@ -34,7 +34,7 @@ function startBastard () {
 	var bastardObj = new bastard.Bastard (config);
 	
 	if (process.env.npm_package_config_preload == 'true') {
-		console.info ("Preloading cache....");
+		if (config.debug) console.info ("Preloading cache....");
 		bastardObj.preload (startListening);
 		if (config.debug) console.info ("Should have preloaded.");
 	} else {
@@ -59,7 +59,7 @@ function startBastard () {
 		if (!handled) {
 			console.warn ("Request not handled by bastard: " + request.method + " " + request.url);
 			response.writeHead (404, {
-				'Server': 'bastard/0.6.0',
+				'Server': 'bastard/0.6.1',
 				'Content-Type': 'text/plain; charset=utf-8'
 			});
             response.end ("Not found.");

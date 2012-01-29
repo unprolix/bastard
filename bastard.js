@@ -47,8 +47,8 @@ function minifyJavascript (data, filePath) {
 function Bastard (config) {
 	var me = this;
 	var debug = config.debug;
-	console.info (config);
 	if (debug) console.info ("Debugging output enabled");
+	if (debug) console.info (config);
 
 	var defaultFileName = config.defaultFileName || 'index.html';
 	var alwaysCheckModTime = config.alwaysCheckModTime;
@@ -76,12 +76,16 @@ function Bastard (config) {
 	}
 	
 	me.minifyHTML = function (data, filePath, basePath) {
-		console.info ("******** Minimizing HTML");
-		console.info ("file path: " + filePath);
-		console.info ("base path: " + basePath);
+		if (debug) {
+			console.info ("******** Minimizing HTML");
+			console.info ("file path: " + filePath);
+			console.info ("base path: " + basePath);
+		}
 		var baseDir = filePath.substring (0, filePath.length - basePath.length);
-		console.info ("base dir: " + baseDir);
-		console.info ("********");
+		if (debug) {
+			console.info ("base dir: " + baseDir);
+			console.info ("********");
+		}
 
 		var provisional = false; // set to true if we are missing a fingerprint
 		
@@ -135,7 +139,7 @@ function Bastard (config) {
 							}
 						}
 					} else if (tagNameLC == 'link' && attributes.type == 'text/css' && 'href' in attributes) {
-						console.info ("*** PROCESSING CSS ***");
+						if (debug) console.info ("*** PROCESSING CSS ***");
 						// special processing for css files
 						var src = attributes.href;
 						var scriptPath;
@@ -188,8 +192,6 @@ function Bastard (config) {
 					break;
 			}
 		} while (token[0]);
-	
-		console.info(processed);
 	
 		var minified = html_minifier.minify (processed, {
 			removeComments: true,
@@ -369,8 +371,8 @@ function Bastard (config) {
 					} else {
 						if (debug) {
 							console.info ("* Rechecking file: " + path);
-							 console.info ("Stored size: " + record.rawSize);
-							 console.info ("  Live size: " + statObj.size);
+							console.info ("Stored size: " + record.rawSize);
+							console.info ("  Live size: " + statObj.size);
 						}
 						if (record.rawSize == statObj.size) {
 							var cacheWhen = Date.parse (record.modified);
@@ -416,7 +418,7 @@ function Bastard (config) {
 
 			fs.readFile (me.cacheInfoFilePath, 'utf8', function (err, data) {
 				if (err) {
-					console.warn ("Could not reload cache info: " + err);
+					if (debug) console.warn ("Could not reload cache info: " + err);
 					delete me.loadingOldCache;
 					checkSetupComplete ();
 					return;
@@ -441,7 +443,7 @@ function Bastard (config) {
 
 
 	function prepareCacheForFile (filePath, basePath, callback) {
-		console.info ("In prepareCacheForFile(" + filePath + ", " + basePath + ")");
+		if (debug) console.info ("In prepareCacheForFile(" + filePath + ", " + basePath + ")");
 		var cacheRecord = {};
 
 		function writeCacheData (filePath, data) {
@@ -505,7 +507,7 @@ function Bastard (config) {
 			cacheData[filePath] = cacheRecord; // set it all at once
 			if (callback instanceof Function) callback (cacheRecord);
 			if (cacheRecord.processedProvisional) {
-				console.info ("Erasing provisional data.");
+				if (debug) console.info ("Erasing provisional data.");
 				delete cacheRecord.remade;
 				delete cacheRecord.processed;
 				delete cacheRecord.gzip;
@@ -561,7 +563,7 @@ function Bastard (config) {
 				if (preprocessor) {
 					var processed = preprocessor (data, filePath, basePath);
 					if (processed.provisional) {
-						console.info ("Preprocessed data is provisional.");
+						if (debug) console.info ("Preprocessed data is provisional.");
 						cacheRecord.processed = processed.value;
 						cacheRecord.processedProvisional = true;
 					} else {
@@ -611,7 +613,7 @@ function Bastard (config) {
 	        'Content-Type': contentType,
 			'Vary': 'Accept-Encoding',
 	        'Cache-Control': "max-age=" + maxAgeInSeconds,
-			'Server': 'bastard/0.6.0'
+			'Server': 'bastard/0.6.1'
 		};
 		if (encoding) responseHeaders['Content-Encoding'] = encoding;
 		if (modificationTime) responseHeaders['Last-Modified'] = modificationTime;
@@ -621,7 +623,7 @@ function Bastard (config) {
 	}
 
 	function serve (response, filePath, basePath, fingerprint, gzipOK, raw, checkModTimeAgainstCache, ifModifiedSince, headOnly) {
-		console.info ("Serving " + basePath + ' out of ' + filePath);
+		if (debug) console.info ("Serving " + basePath + ' out of ' + filePath);
 		var cacheRecord = cacheData[filePath];
 
 		if (checkModTimeAgainstCache && cacheRecord) {
@@ -721,7 +723,7 @@ function Bastard (config) {
 				if (errorHandler) {
 					errorHandler (response, errorCode, errorMessage);
 				} else {
-				    response.writeHead (errorCode, {'Content-Type': 'text/plain; charset=utf-8', 'Server': 'bastard/0.6.0'});
+				    response.writeHead (errorCode, {'Content-Type': 'text/plain; charset=utf-8', 'Server': 'bastard/0.6.1'});
 				    response.end (errorMessage, 'utf8');
 				}
 				return;
@@ -734,7 +736,7 @@ function Bastard (config) {
 				if (errorHandler) {
 					errorHandler (response, 404, errorMessage);
 				} else {
-				    response.writeHead (404, {'Content-Type': 'text/plain; charset=utf-8', 'Server': 'bastard/0.6.0'});
+				    response.writeHead (404, {'Content-Type': 'text/plain; charset=utf-8', 'Server': 'bastard/0.6.1'});
 				    response.end (errorMessage, 'utf8');
 				}
 				return;
@@ -742,7 +744,7 @@ function Bastard (config) {
 			
 			var modificationTime = cacheRecordParam.modified;
 			if (ifModifiedSince && modificationTime && modificationTime <= ifModifiedSince) {
-				response.writeHead (304, {'Server': 'bastard/0.6.0'});
+				response.writeHead (304, {'Server': 'bastard/0.6.1'});
 				response.end ();
 			} else {
 				if (headOnly) {
@@ -753,7 +755,7 @@ function Bastard (config) {
 						if (errorHandler) {
 							errorHandler (response, 404, errorMessage);
 						} else {
-						    response.writeHead (404, {'Content-Type': 'text/plain; charset=utf-8', 'Server': 'bastard/0.6.0'});
+						    response.writeHead (404, {'Content-Type': 'text/plain; charset=utf-8', 'Server': 'bastard/0.6.1'});
 						    response.end (errorMessage, 'utf8');
 						}
 					} else {
@@ -793,7 +795,7 @@ function Bastard (config) {
 		}
 		
 		function serveFromCacheRecord (cacheRecordParam) {
-			response.writeHead (200, {'Content-Type': 'text/plain', 'Server': 'bastard/0.6.0'});
+			response.writeHead (200, {'Content-Type': 'text/plain', 'Server': 'bastard/0.6.1'});
 		    response.end (errorMessage, 'utf8');
 		}
 		
@@ -828,9 +830,11 @@ function Bastard (config) {
 		// console.info ('up: ' + urlPrefix);
 		if (rawURLPrefix && request.url.indexOf (rawURLPrefix) == 0) {
 			var basePath = request.url.substring (rawPrefixLen);
-			console.info ("    raw basePath: " + basePath);
 			var filePath = request.baseDir + basePath;
-			console.info ("    raw filePath: " + filePath);
+			if (debug) {
+				console.info ("    raw basePath: " + basePath);
+				console.info ("    raw filePath: " + filePath);
+			}
 			var acceptEncoding = request.headers['accept-encoding'];
 			var gzipOK = acceptEncoding && (acceptEncoding.split(',').indexOf ('gzip') >= 0);
 			var ifModifiedSince = request.headers['if-modified-since']; // fingerprinted files are never modified, so what do we do here?
@@ -865,16 +869,15 @@ function Bastard (config) {
 			if (basePath.length == 0 || basePath.charAt (basePath.length - 1) == '/') basePath += defaultFileName;
 
 			var filePath = request.baseDir + basePath;
-			console.info ("    filePath: " + filePath);
-			console.info ("    basePath: " + basePath);
+			if (debug) {
+				console.info ("    filePath: " + filePath);
+				console.info ("    basePath: " + basePath);
+			}
 			
 			if (filePath in directoryCheck) {
 				if (directoryCheck[filePath]) {
-					console.info ("It is a directory (i already checked). Should do the special thing.");
 					filePath += "/" + defaultFileName;
 					basePath += "/" + defaultFileName;
-				} else {
-					console.info ("Not a directory. No special thing.");
 				}
 				serve (response, filePath, basePath, null, gzipOK, false, alwaysCheckModTime, ifModifiedSince, headOnly);
 			} else {
@@ -883,11 +886,8 @@ function Bastard (config) {
 						var isDir = statObj.isDirectory ();
 						directoryCheck[filePath] = isDir;
 						if (isDir) {
-							console.info ("It is a directory. Should do the special thing.");
 							filePath += "/" + defaultFileName;
 							basePath += "/" + defaultFileName;
-						} else {
-							console.info ("Not a directory. No special thing.");
 						}
 					}
 					serve (response, filePath, basePath, null, gzipOK, false, alwaysCheckModTime, ifModifiedSince, headOnly);
@@ -917,11 +917,11 @@ function Bastard (config) {
 	me.preload = function (callback) {
 		// Make it so that no overly-expensive operations will happen during a client request.
 		// Reading data from disk is ok, but not calculating fingerprints.
-		console.info ("Hi. preloading.");
+		if (debug) console.info ("Hi. preloading.");
 		var callbackOK = callback instanceof Function;
 		
 		function walk (dir, callback) {
-			console.info ("Walking: " + dir);
+			if (debug) console.info ("Walking: " + dir);
 			fs.readdir (dir, function (err, list) {
 				if (err) return callback (err);
 				var pending = list.length;
