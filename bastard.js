@@ -19,6 +19,8 @@ TODO:
 
 */
 
+var SHOW_PRE_MINIFIED_HTML = false; // for debugging
+
 // thanks to Ateş Göral: http://blog.magnetiq.com/post/514962277/finding-out-class-names-of-javascript-objects
 function getObjectClass (obj) {
     if (obj && obj.constructor && obj.constructor.toString) {
@@ -28,6 +30,12 @@ function getObjectClass (obj) {
     return undefined;
 }
 
+function safeHTMLString (s) {
+  s = s.replace(/>/g, '&gt;');
+  s = s.replace(/</g, '&lt;');
+
+  return s;
+}
 
 // These are reusable
 var JSP = uglify.parser;
@@ -61,6 +69,7 @@ function Bastard (config) {
 	if (debug) console.info (config);
 
 	var defaultFileName = config.defaultFileName || 'index.html';
+	var defaultScriptName = config.defaultScriptName || 'index.js';
 	var alwaysCheckModTime = config.alwaysCheckModTime;
 	var baseDir = config.base;
 	var errorHandler = config.errorHandler;
@@ -229,6 +238,12 @@ function Bastard (config) {
 					break;
 			}
 		} while (token[0]);
+		
+		if (SHOW_PRE_MINIFIED_HTML) {
+			console.info ("-------- PRE-MINIFIED HTML --------");
+			console.info (processed);
+			console.info ("-----------------------------------");
+		}
 	
 		var minified = html_minifier.minify (processed, {
 			removeComments: true,
@@ -875,7 +890,7 @@ function Bastard (config) {
 					} else {
 						value = getObjectClass (value) + ": " + value;
 					}
-					response.write ('<tr><td>' + key + '</td><td>' + value + '</td></tr>', 'utf8');
+					response.write ('<tr><td>' + key + '</td><td>' + safeHTMLString (value) + '</td></tr>', 'utf8');
 				}
 			}
 			response.write ('</tbody></table>', 'utf8');
