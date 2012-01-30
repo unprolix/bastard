@@ -556,6 +556,12 @@ function Bastard (config) {
 		function prerequisitesComplete () {
 			//console.info ('Setting cache for file ' + fileName);
 			// TODO: do we want to NOT store the data if it was an error?
+			if (cacheRecord.dynamic) {
+				// doesn't make sense for us to keep stuff that is unused when it's dynamic
+				delete cacheRecord.raw;
+				delete cacheRecord.processed;
+				delete cacheRecord.gzip;
+			}
 			cacheData[filePath] = cacheRecord; // set it all at once
 			if (callback instanceof Function) callback (cacheRecord);
 			if (cacheRecord.processedProvisional) {
@@ -651,7 +657,8 @@ function Bastard (config) {
 				//console.log ("Err from stat on file: " + filePath);
 			} else {
 				cacheRecord.rawSize = stat.size;
-				cacheRecord.modified = stat.mtime;			
+				cacheRecord.modified = stat.mtime;
+				cacheRecord.dynamic = (stat.mode & parseInt('0100', 8)) && (filePath.substring (filePath.lastIndexOf ('.')+1) == 'js');
 			}
 			statComplete = true;
 			if (dataComplete && fingerprintComplete) prerequisitesComplete ();
@@ -674,7 +681,8 @@ function Bastard (config) {
 	    response.end (data, charset);
 	}
 
-	function serve (response, filePath, basePath, fingerprint, gzipOK, raw, checkModTimeAgainstCache, ifModifiedSince, headOnly) {
+
+	function serve (request, response, filePath, basePath, fingerprint, gzipOK, raw, checkModTimeAgainstCache, ifModifiedSince, headOnly) {
 		if (debug) console.info ("Serving " + basePath + ' out of ' + filePath);
 		var cacheRecord = cacheData[filePath];
 
@@ -684,7 +692,7 @@ function Bastard (config) {
 				if (stat && stat.mtime != cacheRecord.modified) {
 					delete cacheData[filePath];
 				}
-				serve (response, filePath, basePath, fingerprint, gzipOK, raw, false, ifModifiedSince, headOnly);
+				serve (request, response, filePath, basePath, fingerprint, gzipOK, raw, false, ifModifiedSince, headOnly);
 			});
 			return;
 		}
@@ -693,6 +701,14 @@ function Bastard (config) {
 			if (debug) console.info ("Serve " + basePath + " from cache record: " + formatCacheRecord (cacheRecordParam));
 			if (gzipOK && cacheRecordParam.contentType && cacheRecordParam.contentType.indexOf ('image/') == 0) {
 				gzipOK = false; // do not gzip image files.
+			}
+			
+			if (cacheRecordParam.dynamic) {
+				if (!cacheRecordParam.module) cacheRecordParam.module = require (filePath);
+				var dynamicResult = cacheRecordParam.module.main (request);
+				response.writeHead (dynamicResult.statusCode || 200, dynamicResult.headers);
+				response.end (dynamicResult.result, dynamicResult.charset);
+				return;				
 			}
 			
 			function remakeCacheRecord () {
@@ -918,8 +934,6 @@ function Bastard (config) {
 				displayCache (response);
 				return;
 			}
-		
-		
 		}
 		
 		if (rawURLPrefix && request.url.indexOf (rawURLPrefix) == 0) {
@@ -933,7 +947,7 @@ function Bastard (config) {
 			var gzipOK = acceptEncoding && (acceptEncoding.split(',').indexOf ('gzip') >= 0);
 			var ifModifiedSince = request.headers['if-modified-since']; // fingerprinted files are never modified, so what do we do here?
 			var headOnly = request.method == 'HEAD';
-			serve (response, filePath, basePath, null, false, true, alwaysCheckModTime, ifModifiedSince, headOnly);
+			serve (request, response, filePath, basePath, null, false, true, alwaysCheckModTime, ifModifiedSince, headOnly);
 			return true;
 		}
 
@@ -949,10 +963,11 @@ function Bastard (config) {
 			var gzipOK = acceptEncoding && (acceptEncoding.split(',').indexOf ('gzip') >= 0);
 			var ifModifiedSince = request.headers['if-modified-since']; // fingerprinted files are never modified, so what do we do here?
 			var headOnly = request.method == 'HEAD';
-			serve (response, filePath, basePath, fingerprint, gzipOK, false, alwaysCheckModTime, ifModifiedSince, headOnly);
+			serve (request, response, filePath, basePath, fingerprint, gzipOK, false, alwaysCheckModTime, ifModifiedSince, headOnly);
 			return true;
 		}
 		if (request.url.indexOf (urlPrefix) == 0) {
+			if (debug) console.info ("Matches the regular URL prefix.");
 			var acceptEncoding = request.headers['accept-encoding'];
 			var gzipOK = acceptEncoding && (acceptEncoding.split(',').indexOf ('gzip') >= 0);
 			var ifModifiedSince = request.headers['if-modified-since']; // fingerprinted files are never modified, so what do we do here?
@@ -960,31 +975,68 @@ function Bastard (config) {
 
 			var basePath = request.url.substring (urlPrefixLen);
 			
-			if (basePath.length == 0 || basePath.charAt (basePath.length - 1) == '/') basePath += defaultFileName;
+			//if (basePath.length == 0 || basePath.charAt (basePath.length - 1) == '/') basePath += defaultFileName;
 
 			var filePath = request.baseDir + basePath;
+			
+			if (filePath.charAt (filePath.length - 1) == '/')
+				filePath = filePath.substring (0, filePath.length - 1);
+			
 			if (debug) {
 				console.info ("    filePath: " + filePath);
 				console.info ("    basePath: " + basePath);
 			}
 			
 			if (filePath in directoryCheck) {
-				if (directoryCheck[filePath]) {
-					filePath += "/" + defaultFileName;
-					basePath += "/" + defaultFileName;
+				var checkValue = directoryCheck[filePath];
+				if (checkValue == true) {
+					// it's a directory but neither of the default files is present
+				} else if (checkValue instanceof String) {
+					filePath += '/' + checkValue;
+					basePath += '/' + checkValue;
 				}
-				serve (response, filePath, basePath, null, gzipOK, false, alwaysCheckModTime, ifModifiedSince, headOnly);
+				serve (request, response, filePath, basePath, null, gzipOK, false, alwaysCheckModTime, ifModifiedSince, headOnly);
 			} else {
 				fs.stat (filePath, function (err, statObj) {
+					if (debug) console.info ("Results from stat:" + JSON.stringify(arguments));
 					if (!err) {
 						var isDir = statObj.isDirectory ();
 						directoryCheck[filePath] = isDir;
 						if (isDir) {
-							filePath += "/" + defaultFileName;
-							basePath += "/" + defaultFileName;
+							var scriptFilePath = filePath + '/' + defaultScriptName;
+							fs.stat (scriptFilePath, function (err, statObj) {
+								if (!err && statObj.mode & parseInt ('0100', 8)) {
+									directoryCheck[filePath] = defaultScriptName;
+									filePath = scriptFilePath;
+									basePath += '/' + defaultScriptName;
+									serve (request, response, filePath, basePath, null, gzipOK, false, alwaysCheckModTime, ifModifiedSince, headOnly);
+								} else {
+									// file not found or was not executable. try the non-script default.
+									var indexFilePath = filePath + '/' + defaultFileName;
+									fs.stat (indexFilePath, function (err, statObj) {
+										if (!err) {
+											directoryCheck[filePath] = defaultFileName;
+											filePath = indexFilePath;
+											basePath += '/' + defaultFileName;
+											serve (request, response, filePath, basePath, null, gzipOK, false, alwaysCheckModTime, ifModifiedSince, headOnly);
+										} else {
+											// we could theoretically generate an automatic index here.
+											directoryCheck[filePath] = true; // as a signal that there is no good file here.
+											// we expect this to serve serve a 403 or an automatic directory listing
+											serve (request, response, filePath, basePath, null, gzipOK, false, alwaysCheckModTime, ifModifiedSince, headOnly);
+										}
+									});
+								}
+							});
+						} else {
+							// it is a file. so we just serve the file.
+							if (debug) console.info ("Handling as a regular file.");
+							serve (request, response, filePath, basePath, null, gzipOK, false, alwaysCheckModTime, ifModifiedSince, headOnly);
 						}
+					} else {
+						// not found. For now we let serve() handle that even though there's some repeated work.
+						serve (request, response, filePath, basePath, null, gzipOK, false, alwaysCheckModTime, ifModifiedSince, headOnly);
 					}
-					serve (response, filePath, basePath, null, gzipOK, false, alwaysCheckModTime, ifModifiedSince, headOnly);
 				});
 			}
 			
