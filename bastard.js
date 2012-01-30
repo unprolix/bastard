@@ -19,6 +19,16 @@ TODO:
 
 */
 
+// thanks to Ateş Göral: http://blog.magnetiq.com/post/514962277/finding-out-class-names-of-javascript-objects
+function getObjectClass (obj) {
+    if (obj && obj.constructor && obj.constructor.toString) {
+        var arr = obj.constructor.toString ().match (/function\s*(\w+)/);
+        if (arr && arr.length == 2) return arr[1];
+    }
+    return undefined;
+}
+
+
 // These are reusable
 var JSP = uglify.parser;
 var PRO = uglify.uglify;
@@ -93,7 +103,7 @@ function Bastard (config) {
 		// identify embedded JS and replace it with minimized JS
 		// identify referenced CSS and if the fingerprint is available, replace with a reference to the fingerprinted version
 		// identify referenced JS and if the fingerprint is available, replace with a reference to the fingerprinted version
-		// identify referenced images and if the fingerprint is available, replace with a reference to the fingerprinted version
+		// TODO: identify referenced images and if the fingerprint is available, replace with a reference to the fingerprinted version
 		
 		var dirPath = basePath.substring (0, basePath.lastIndexOf('/'));
 		
@@ -119,6 +129,32 @@ function Bastard (config) {
 						if ('src' in attributes) {
 							// special processing for script tags
 							var src = attributes.src;
+							if (src.indexOf('http://') == -1 && src.indexOf('https://') == -1) {
+								var scriptPath;
+								if (src.charAt(0) == '/') {
+									scriptPath = baseDir + src.substring(1);
+									if (debug) console.info ("Script source begins with slash so it's from base files dir of the bastard, and path is: " + scriptPath);
+								} else {
+									scriptPath = baseDir + dirPath + "/" + src;
+									if (dirPath.length > 0) src = '/' + dirPath + "/" + src;
+									else src = '/' + src;
+									if (debug) console.info ("Script source does not begin with slash so it's relative to the requested url, and path is: " + scriptPath);								
+								}
+								
+								var fingerprint = me.getFingerprint (scriptPath, null);
+								if (!fingerprint) {
+									if (debug) console.info ("No fingerprint found for " + scriptPath);
+									provisional = true;
+								} else {
+									attributes.src = fingerprintURLPrefix + fingerprint + src;
+								}
+							}
+						}
+					} else if (tagNameLC == 'link' && attributes.type == 'text/css' && 'href' in attributes) {
+						if (debug) console.info ("*** PROCESSING CSS ***");
+						// special processing for css files
+						var src = attributes.href;
+						if (src.indexOf('http://') == -1 && src.indexOf('https://') == -1) {
 							var scriptPath;
 							if (src.charAt(0) == '/') {
 								scriptPath = baseDir + src.substring(1);
@@ -135,33 +171,34 @@ function Bastard (config) {
 								if (debug) console.info ("No fingerprint found for " + scriptPath);
 								provisional = true;
 							} else {
-								attributes.src = fingerprintURLPrefix + fingerprint + src;
+								attributes.href = fingerprintURLPrefix + fingerprint + src;
 							}
-						}
-					} else if (tagNameLC == 'link' && attributes.type == 'text/css' && 'href' in attributes) {
-						if (debug) console.info ("*** PROCESSING CSS ***");
-						// special processing for css files
-						var src = attributes.href;
-						var scriptPath;
-						if (src.charAt(0) == '/') {
-							scriptPath = baseDir + src.substring(1);
-							if (debug) console.info ("Script source begins with slash so it's from base files dir of the bastard, and path is: " + scriptPath);
-						} else {
-							scriptPath = baseDir + dirPath + "/" + src;
-							if (dirPath.length > 0) src = '/' + dirPath + "/" + src;
-							else src = '/' + src;
-							if (debug) console.info ("Script source does not begin with slash so it's relative to the requested url, and path is: " + scriptPath);								
-						}
-						
-						var fingerprint = me.getFingerprint (scriptPath, null);
-						if (!fingerprint) {
-							if (debug) console.info ("No fingerprint found for " + scriptPath);
-							provisional = true;
-						} else {
-							attributes.href = fingerprintURLPrefix + fingerprint + src;
 						}
 					} else if (tagNameLC == 'style' && attributes.type == 'text/css') {
 						insideCSSTag = true;
+					} else if (tagNameLC == 'img' && 'src' in attributes) {
+						var src = attributes.src;
+						if (src.indexOf('http://') == -1 && src.indexOf('https://') == -1) {
+
+							var srcPath;
+							if (src.charAt(0) == '/') {
+								srcPath = baseDir + src.substring(1);
+								if (debug) console.info ("Image source begins with slash so it's from base files dir of the bastard, and path is: " + srcPath);
+							} else {
+								srcPath = baseDir + dirPath + src;
+								if (dirPath.length > 0) src = '/' + dirPath + "/" + src;
+								else src = '/' + src;
+								if (debug) console.info ("Image source does not begin with slash so it's relative to the requested url, and path is: " + srcPath);								
+							}
+							
+							var fingerprint = me.getFingerprint (srcPath, null);
+							if (!fingerprint) {
+								if (debug) console.info ("No fingerprint found for " + src);
+								provisional = true;
+							} else {
+								attributes.src = fingerprintURLPrefix + fingerprint + src;
+							}
+						}
 					}
 					
 					var tag = "<" + tagName;
@@ -817,6 +854,38 @@ function Bastard (config) {
 	}
 	
 	
+	function displayCache (response) {
+		response.writeHead (404, {'Content-Type': 'text/html; charset=utf-8', 'Server': 'bastard/0.6.2'});
+		response.write ('<html><body>', 'utf8');
+		for (var cacheKey in cacheData) {
+			response.write ('<h1>' + cacheKey + '</h1>', 'utf8');
+			response.write ('<table><thead><tr><th>key</th><th>value</th></tr></thead><tbody>', 'utf8');
+			var cacheRecord = cacheData[cacheKey];
+			for (var key in cacheRecord) {
+				var value = cacheRecord[key];
+				if (key == 'gzip') value = "BINARY DATA";
+				var valueType = typeof value;
+				if (valueType == 'number') response.write ('<tr><td>' + key + '</td><td>' + value + '</td></tr>', 'utf8');
+				else if (value == null) response.write ('<tr><td>' + key + '</td><td><em>null</em></td></tr>', 'utf8');
+				else {
+					if (value instanceof Buffer) value = value.toString ();
+					var origLen = value.length;
+					if (value.substring && origLen > 64) {
+						value = value.substring (0,64) + "... (original size: " + origLen + ")";
+					} else {
+						value = getObjectClass (value) + ": " + value;
+					}
+					response.write ('<tr><td>' + key + '</td><td>' + value + '</td></tr>', 'utf8');
+				}
+			}
+			response.write ('</tbody></table>', 'utf8');
+
+		}
+		response.end ('<hr>Done!</body></html>', 'utf8');
+	
+	}
+	
+	
 	var fingerprintPrefixLen = fingerprintURLPrefix.length;
 	var urlPrefixLen = urlPrefix.length;
 	var rawPrefixLen = rawURLPrefix.length;
@@ -825,9 +894,19 @@ function Bastard (config) {
 		if (virtualHostMode) request.baseDir = matchingVirtualHostDir (request.headers.host);
 		else request.baseDir = baseDir;
 
-		// console.info ("PFC maybe handling: " + request.url);
+		if (debug) console.info ("PFC maybe handling: " + request.url);
 		// console.info ('fup: ' + fingerprintURLPrefix);
 		// console.info ('up: ' + urlPrefix);
+		
+		if (debug) {
+			if (request.url == '/DEBUG/cache') {
+				displayCache (response);
+				return;
+			}
+		
+		
+		}
+		
 		if (rawURLPrefix && request.url.indexOf (rawURLPrefix) == 0) {
 			var basePath = request.url.substring (rawPrefixLen);
 			var filePath = request.baseDir + basePath;
