@@ -1,6 +1,6 @@
 {
 	"name": "bastard",
-	"version": "0.6.3",
+	"version": "0.6.5",
 	"description": "A webserver for static files that does things right.",
 	"keywords": "webserver, fingerprint, static",
 	"homepage": "http://jeremy.org/bastard/",
@@ -48,7 +48,8 @@
 		"csso": ">=1.2.8",
 		"gzip": ">=0.1.0",
 		"mime": ">=1.2.4",
-		"html-minifier": ">=0.4.5"
+		"html-minifier": ">=0.4.5",
+		"htmlscanner": ">=0.7.0"
 	},
 	
 	"engines": {

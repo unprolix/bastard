@@ -672,7 +672,7 @@ function Bastard (config) {
 	        'Content-Type': contentType,
 			'Vary': 'Accept-Encoding',
 	        'Cache-Control': "max-age=" + maxAgeInSeconds,
-			'Server': 'bastard/0.6.3'
+			'Server': 'bastard/0.6.5'
 		};
 		if (encoding) responseHeaders['Content-Encoding'] = encoding;
 		if (modificationTime) responseHeaders['Last-Modified'] = modificationTime;
@@ -683,7 +683,7 @@ function Bastard (config) {
 
 
 	function serve (request, response, filePath, basePath, fingerprint, gzipOK, raw, checkModTimeAgainstCache, ifModifiedSince, headOnly) {
-		if (debug) console.info ("Serving " + basePath + ' out of ' + filePath);
+		if (debug) console.info ("Serving \"" + basePath + '\" out of ' + filePath);
 		var cacheRecord = cacheData[filePath];
 
 		if (checkModTimeAgainstCache && cacheRecord) {
@@ -791,7 +791,7 @@ function Bastard (config) {
 				if (errorHandler) {
 					errorHandler (response, errorCode, errorMessage);
 				} else {
-				    response.writeHead (errorCode, {'Content-Type': 'text/plain; charset=utf-8', 'Server': 'bastard/0.6.3'});
+				    response.writeHead (errorCode, {'Content-Type': 'text/plain; charset=utf-8', 'Server': 'bastard/0.6.5'});
 				    response.end (errorMessage, 'utf8');
 				}
 				return;
@@ -804,7 +804,7 @@ function Bastard (config) {
 				if (errorHandler) {
 					errorHandler (response, 404, errorMessage);
 				} else {
-				    response.writeHead (404, {'Content-Type': 'text/plain; charset=utf-8', 'Server': 'bastard/0.6.3'});
+				    response.writeHead (404, {'Content-Type': 'text/plain; charset=utf-8', 'Server': 'bastard/0.6.5'});
 				    response.end (errorMessage, 'utf8');
 				}
 				return;
@@ -812,7 +812,7 @@ function Bastard (config) {
 			
 			var modificationTime = cacheRecordParam.modified;
 			if (ifModifiedSince && modificationTime && modificationTime <= ifModifiedSince) {
-				response.writeHead (304, {'Server': 'bastard/0.6.3'});
+				response.writeHead (304, {'Server': 'bastard/0.6.5'});
 				response.end ();
 			} else {
 				if (headOnly) {
@@ -823,7 +823,7 @@ function Bastard (config) {
 						if (errorHandler) {
 							errorHandler (response, 404, errorMessage);
 						} else {
-						    response.writeHead (404, {'Content-Type': 'text/plain; charset=utf-8', 'Server': 'bastard/0.6.3'});
+						    response.writeHead (404, {'Content-Type': 'text/plain; charset=utf-8', 'Server': 'bastard/0.6.5'});
 						    response.end (errorMessage, 'utf8');
 						}
 					} else {
@@ -863,7 +863,7 @@ function Bastard (config) {
 		}
 		
 		function serveFromCacheRecord (cacheRecordParam) {
-			response.writeHead (200, {'Content-Type': 'text/plain', 'Server': 'bastard/0.6.3'});
+			response.writeHead (200, {'Content-Type': 'text/plain', 'Server': 'bastard/0.6.5'});
 		    response.end (errorMessage, 'utf8');
 		}
 		
@@ -886,7 +886,7 @@ function Bastard (config) {
 	
 	
 	function displayCache (response) {
-		response.writeHead (404, {'Content-Type': 'text/html; charset=utf-8', 'Server': 'bastard/0.6.3'});
+		response.writeHead (404, {'Content-Type': 'text/html; charset=utf-8', 'Server': 'bastard/0.6.5'});
 		response.write ('<html><body>', 'utf8');
 		for (var cacheKey in cacheData) {
 			response.write ('<h1>' + cacheKey + '</h1>', 'utf8');
@@ -991,9 +991,13 @@ function Bastard (config) {
 				var checkValue = directoryCheck[filePath];
 				if (checkValue == true) {
 					// it's a directory but neither of the default files is present
-				} else if (checkValue instanceof String) {
+					if (debug) console.info("*** it's a directory but neither of the default files is present");
+				} else if (typeof (checkValue) == 'string') {
+					if (debug) console.info("*** it's a directory and I will serve " + checkValue);
 					filePath += '/' + checkValue;
 					basePath += '/' + checkValue;
+				} else {
+					if (debug) console.info("*** value: " + checkValue);
 				}
 				serve (request, response, filePath, basePath, null, gzipOK, false, alwaysCheckModTime, ifModifiedSince, headOnly);
 			} else {
