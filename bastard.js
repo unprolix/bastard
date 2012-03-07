@@ -672,7 +672,7 @@ function Bastard (config) {
 	        'Content-Type': contentType,
 			'Vary': 'Accept-Encoding',
 	        'Cache-Control': "max-age=" + maxAgeInSeconds,
-			'Server': 'bastard/0.6.6'
+			'Server': 'bastard/0.6.7'
 		};
 		if (encoding) responseHeaders['Content-Encoding'] = encoding;
 		if (modificationTime) responseHeaders['Last-Modified'] = modificationTime;
@@ -791,7 +791,7 @@ function Bastard (config) {
 				if (errorHandler) {
 					errorHandler (response, errorCode, errorMessage);
 				} else {
-				    response.writeHead (errorCode, {'Content-Type': 'text/plain; charset=utf-8', 'Server': 'bastard/0.6.6'});
+				    response.writeHead (errorCode, {'Content-Type': 'text/plain; charset=utf-8', 'Server': 'bastard/0.6.7'});
 				    response.end (errorMessage, 'utf8');
 				}
 				return;
@@ -804,7 +804,7 @@ function Bastard (config) {
 				if (errorHandler) {
 					errorHandler (response, 404, errorMessage);
 				} else {
-				    response.writeHead (404, {'Content-Type': 'text/plain; charset=utf-8', 'Server': 'bastard/0.6.6'});
+				    response.writeHead (404, {'Content-Type': 'text/plain; charset=utf-8', 'Server': 'bastard/0.6.7'});
 				    response.end (errorMessage, 'utf8');
 				}
 				return;
@@ -812,7 +812,7 @@ function Bastard (config) {
 			
 			var modificationTime = cacheRecordParam.modified;
 			if (ifModifiedSince && modificationTime && modificationTime <= ifModifiedSince) {
-				response.writeHead (304, {'Server': 'bastard/0.6.6'});
+				response.writeHead (304, {'Server': 'bastard/0.6.7'});
 				response.end ();
 			} else {
 				if (headOnly) {
@@ -823,7 +823,7 @@ function Bastard (config) {
 						if (errorHandler) {
 							errorHandler (response, 404, errorMessage);
 						} else {
-						    response.writeHead (404, {'Content-Type': 'text/plain; charset=utf-8', 'Server': 'bastard/0.6.6'});
+						    response.writeHead (404, {'Content-Type': 'text/plain; charset=utf-8', 'Server': 'bastard/0.6.7'});
 						    response.end (errorMessage, 'utf8');
 						}
 					} else {
@@ -863,7 +863,7 @@ function Bastard (config) {
 		}
 		
 		function serveFromCacheRecord (cacheRecordParam) {
-			response.writeHead (200, {'Content-Type': 'text/plain', 'Server': 'bastard/0.6.6'});
+			response.writeHead (200, {'Content-Type': 'text/plain', 'Server': 'bastard/0.6.7'});
 		    response.end (errorMessage, 'utf8');
 		}
 		
@@ -888,7 +888,7 @@ function Bastard (config) {
 	
 	
 	function displayCache (response) {
-		response.writeHead (404, {'Content-Type': 'text/html; charset=utf-8', 'Server': 'bastard/0.6.6'});
+		response.writeHead (404, {'Content-Type': 'text/html; charset=utf-8', 'Server': 'bastard/0.6.7'});
 		response.write ('<html><body>', 'utf8');
 		for (var cacheKey in cacheData) {
 			response.write ('<h1>' + cacheKey + '</h1>', 'utf8');
@@ -923,11 +923,11 @@ function Bastard (config) {
 	var urlPrefixLen = urlPrefix.length;
 	var rawPrefixLen = rawURLPrefix.length;
 	var directoryCheck = {};
-	me.possiblyHandleRequest = function (request, response) {
+	me.possiblyHandleRequest = function (request, response, callback) {
 		if (virtualHostMode) request.baseDir = matchingVirtualHostDir (request.headers.host);
 		else request.baseDir = baseDir;
 
-		if (debug) console.info ("PFC maybe handling: " + request.url);
+		if (debug) console.info ("Bastard maybe handling: " + request.url);
 		// console.info ('fup: ' + fingerprintURLPrefix);
 		// console.info ('up: ' + urlPrefix);
 		
@@ -1040,8 +1040,12 @@ function Bastard (config) {
 							serve (request, response, filePath, basePath, null, gzipOK, false, alwaysCheckModTime, ifModifiedSince, headOnly);
 						}
 					} else {
-						// not found. For now we let serve() handle that even though there's some repeated work.
-						serve (request, response, filePath, basePath, null, gzipOK, false, alwaysCheckModTime, ifModifiedSince, headOnly);
+						if (callback) {
+							callback (request, response);
+						} else {
+							// not found, and no not-found callback. For now we let serve() handle that even though there's some repeated work.
+							serve (request, response, filePath, basePath, null, gzipOK, false, alwaysCheckModTime, ifModifiedSince, headOnly);
+						}
 					}
 				});
 			}
