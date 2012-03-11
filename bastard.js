@@ -634,16 +634,23 @@ function Bastard (config) {
 				writeCacheData (me.processedFileCacheDir + basePath, cacheRecord.processed);
 				
 				if (cacheRecord.contentType && cacheRecord.contentType.indexOf ('image/') != 0) {
-					gzip (cacheRecord.processed, function (err, gzippedData) {
-						if (err) {
-							cacheRecord.fileError = err;
-						} else {
-							cacheRecord.gzip = gzippedData;
-							writeCacheData (me.gzippedFileCacheDir + basePath + '.gz', cacheRecord.gzip);
-						}
-						dataComplete = true;
-						if (statComplete && fingerprintComplete) prerequisitesComplete ();
-					});					
+					try {
+						gzip (cacheRecord.processed, function (err, gzippedData) {
+							if (err) {
+								cacheRecord.fileError = err;
+							} else {
+								cacheRecord.gzip = gzippedData;
+								writeCacheData (me.gzippedFileCacheDir + basePath + '.gz', cacheRecord.gzip);
+							}
+							dataComplete = true;
+							if (statComplete && fingerprintComplete) prerequisitesComplete ();
+						});
+                    catch (err) {
+                        console.error ("Problem gzipping: " + err);
+                        cacheRecord.fileError = err;
+                        dataComplete = true;
+                        if (statComplete && fingerprintComplete) prerequisitesComplete ();
+                    }
 				} else {
 					if (debug) console.info ("Not gzipping an image");
 					dataComplete = true;
