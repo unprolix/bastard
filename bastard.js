@@ -679,7 +679,7 @@ function Bastard (config) {
 	        'Content-Type': contentType,
 			'Vary': 'Accept-Encoding',
 	        'Cache-Control': "max-age=" + maxAgeInSeconds,
-			'Server': 'bastard/0.6.7'
+			'Server': 'bastard/0.6.8'
 		};
 		if (encoding) responseHeaders['Content-Encoding'] = encoding;
 		if (modificationTime) responseHeaders['Last-Modified'] = modificationTime;
@@ -798,7 +798,7 @@ function Bastard (config) {
 				if (errorHandler) {
 					errorHandler (response, errorCode, errorMessage);
 				} else {
-				    response.writeHead (errorCode, {'Content-Type': 'text/plain; charset=utf-8', 'Server': 'bastard/0.6.7'});
+				    response.writeHead (errorCode, {'Content-Type': 'text/plain; charset=utf-8', 'Server': 'bastard/0.6.8'});
 				    response.end (errorMessage, 'utf8');
 				}
 				return;
@@ -811,7 +811,7 @@ function Bastard (config) {
 				if (errorHandler) {
 					errorHandler (response, 404, errorMessage);
 				} else {
-				    response.writeHead (404, {'Content-Type': 'text/plain; charset=utf-8', 'Server': 'bastard/0.6.7'});
+				    response.writeHead (404, {'Content-Type': 'text/plain; charset=utf-8', 'Server': 'bastard/0.6.8'});
 				    response.end (errorMessage, 'utf8');
 				}
 				return;
@@ -819,7 +819,7 @@ function Bastard (config) {
 			
 			var modificationTime = cacheRecordParam.modified;
 			if (ifModifiedSince && modificationTime && modificationTime <= ifModifiedSince) {
-				response.writeHead (304, {'Server': 'bastard/0.6.7'});
+				response.writeHead (304, {'Server': 'bastard/0.6.8'});
 				response.end ();
 			} else {
 				if (headOnly) {
@@ -830,7 +830,7 @@ function Bastard (config) {
 						if (errorHandler) {
 							errorHandler (response, 404, errorMessage);
 						} else {
-						    response.writeHead (404, {'Content-Type': 'text/plain; charset=utf-8', 'Server': 'bastard/0.6.7'});
+						    response.writeHead (404, {'Content-Type': 'text/plain; charset=utf-8', 'Server': 'bastard/0.6.8'});
 						    response.end (errorMessage, 'utf8');
 						}
 					} else {
@@ -870,7 +870,7 @@ function Bastard (config) {
 		}
 		
 		function serveFromCacheRecord (cacheRecordParam) {
-			response.writeHead (200, {'Content-Type': 'text/plain', 'Server': 'bastard/0.6.7'});
+			response.writeHead (200, {'Content-Type': 'text/plain', 'Server': 'bastard/0.6.8'});
 		    response.end (errorMessage, 'utf8');
 		}
 		
@@ -895,7 +895,7 @@ function Bastard (config) {
 	
 	
 	function displayCache (response) {
-		response.writeHead (404, {'Content-Type': 'text/html; charset=utf-8', 'Server': 'bastard/0.6.7'});
+		response.writeHead (404, {'Content-Type': 'text/html; charset=utf-8', 'Server': 'bastard/0.6.8'});
 		response.write ('<html><body>', 'utf8');
 		for (var cacheKey in cacheData) {
 			response.write ('<h1>' + cacheKey + '</h1>', 'utf8');
