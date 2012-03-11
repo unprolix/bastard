@@ -645,6 +645,7 @@ function Bastard (config) {
 							dataComplete = true;
 							if (statComplete && fingerprintComplete) prerequisitesComplete ();
 						});
+					}
                     catch (err) {
                         console.error ("Problem gzipping: " + err);
                         cacheRecord.fileError = err;
