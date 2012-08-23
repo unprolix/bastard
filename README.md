@@ -1,3 +1,4 @@
+[![build status](https://secure.travis-ci.org/unprolix/bastard.png)](http://travis-ci.org/unprolix/bastard)
 BASTARD
 =======
 
